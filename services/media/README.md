@@ -6,18 +6,18 @@ policy enforced by code.
 
 ```mermaid
 flowchart LR
-    req["Jellyseerr\nrequests"] --> arr["Radarr / Sonarr"]
-    arr --> prowlarr["Prowlarr\nindexers"] --> arr
+    req["Jellyseerr<br/>requests"] --> arr["Radarr / Sonarr"]
+    arr --> prowlarr["Prowlarr<br/>indexers"] --> arr
     arr --> qb
     subgraph vpn["gluetun network namespace"]
         qb["qBittorrent"]
     end
     irc["tracker IRC announces"] --> autobrr["autobrr"] -->|"race category"| qb
-    qb --> unpackerr["unpackerr\nextract"] --> arr
+    qb --> unpackerr["unpackerr<br/>extract"] --> arr
     arr -->|hardlink import| lib["/mnt/media library"]
     lib --> jf["Jellyfin"]
-    lib --> xseed["cross-seed\ninstant seeds"] --> qb
-    bazarr["Bazarr\nsubtitles"] --> lib
+    lib --> xseed["cross-seed<br/>instant seeds"] --> qb
+    bazarr["Bazarr<br/>subtitles"] --> lib
 ```
 
 ## VPN isolation

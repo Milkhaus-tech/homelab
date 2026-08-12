@@ -18,10 +18,10 @@ the torrent VPN's provider-side forwarded port, or the Tailscale mesh.
 
 ```mermaid
 flowchart LR
-    dns["Cloudflare DNS\n*.milkhaus.net"] --> vps
+    dns["Cloudflare DNS<br/>*.milkhaus.net"] --> vps
     subgraph vps["Edge VPS"]
-        caddy["Caddy\nHTTPS vhosts"]
-        ipt["iptables DNAT\ngame UDP/TCP"]
+        caddy["Caddy<br/>HTTPS vhosts"]
+        ipt["iptables DNAT<br/>game UDP/TCP"]
     end
     caddy -->|"wg0 · 10.0.0.2"| box["noahlab"]
     ipt -->|"wg0 · 10.0.0.2"| box

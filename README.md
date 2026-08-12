@@ -34,13 +34,13 @@ flowchart TB
     dnat -->|"WireGuard tunnel"| lab
 
     subgraph lab["noahlab · Ryzen 7 2700X · GTX 1660 SUPER · 32 GB · Ubuntu 24.04"]
-        media["Media pipeline\n13 services behind a VPN namespace"]
-        jelly["Jellyfin\nNVENC transcode + 84-ch live TV"]
-        nvr["Frigate NVR\n9 cameras · YOLOX on TensorRT"]
-        ha["Home Assistant\nMQTT · Matter · presence HVAC"]
-        games["Pterodactyl panel + Wings\nZomboid · Factorio · Minecraft"]
-        mon["Prometheus + Grafana\ndashboards as code"]
-        vd["Virtual desktop\nheadless X · Sunshine · agent browser"]
+        media["Media pipeline<br/>13 services behind a VPN namespace"]
+        jelly["Jellyfin<br/>NVENC transcode + 84-ch live TV"]
+        nvr["Frigate NVR<br/>9 cameras · YOLOX on TensorRT"]
+        ha["Home Assistant<br/>MQTT · Matter · presence HVAC"]
+        games["Pterodactyl panel + Wings<br/>Zomboid · Factorio · Minecraft"]
+        mon["Prometheus + Grafana<br/>dashboards as code"]
+        vd["Virtual desktop<br/>headless X · Sunshine · agent browser"]
     end
 ```
 

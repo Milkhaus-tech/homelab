@@ -12,17 +12,17 @@ one workload here that cannot be redone if it breaks.
 
 ```mermaid
 flowchart LR
-    phone["Moonlight\n(phone / laptop)"] -->|Tailscale| sun0
-    agent["AI agents\n(chrome-devtools MCP)"] -->|"localhost CDP"| chr0
+    phone["Moonlight<br/>(phone / laptop)"] -->|Tailscale| sun0
+    agent["AI agents<br/>(chrome-devtools MCP)"] -->|"localhost CDP"| chr0
 
     subgraph gpu["Xorg :0 — real GPU, NVENC"]
-        sun0["Sunshine :47989"] --- desk0["XFCE"] --- chr0["Chromium\nCDP 9222"]
+        sun0["Sunshine :47989"] --- desk0["XFCE"] --- chr0["Chromium<br/>CDP 9222"]
     end
     subgraph xvfb1["Xvfb :11 — standard desktop (always on)"]
-        sun1["Sunshine :48989"] --- br1["input bridge"] --- chr1["Chromium\nCDP 9311"]
+        sun1["Sunshine :48989"] --- br1["input bridge"] --- chr1["Chromium<br/>CDP 9311"]
     end
     subgraph xvfb2["Xvfb :12 — war room (draft days only)"]
-        sun2["Sunshine :49989"] --- br2["input bridge"] --- chr2["Chromium\nCDP 9312"]
+        sun2["Sunshine :49989"] --- br2["input bridge"] --- chr2["Chromium<br/>CDP 9312"]
     end
 ```
 
