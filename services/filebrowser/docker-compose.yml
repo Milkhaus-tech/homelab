@@ -1,0 +1,15 @@
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: always
+    ports:
+      - "8087:80"
+    volumes:
+      - /mnt/media:/srv              # Your media library (read-only option: /mnt/media:/srv:ro)
+      - ./filebrowser.db:/database.db
+      - ./config.json:/.filebrowser.json
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Los_Angeles

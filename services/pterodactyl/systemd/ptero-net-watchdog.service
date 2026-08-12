@@ -1,0 +1,7 @@
+[Unit]
+Description=Recreate pterodactyl_nw via wings restart when missing
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ptero-net-watchdog

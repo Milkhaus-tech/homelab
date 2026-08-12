@@ -1,0 +1,94 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /opt/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /opt/prometheus/data:/prometheus
+      - /opt/prometheus/ha_token:/etc/prometheus/ha_token:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_PANELS_DISABLE_SANITIZE_HTML=true # single-admin box: allows <style> in text panels (Teto skin)
+      - GF_NEWS_NEWS_FEED_ENABLED=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+    volumes:
+      - /opt/grafana:/var/lib/grafana
+      # Teto branding: art served at /public/img/teto/, favicon + boot logo overridden in place
+      - /opt/monitoring/branding:/usr/share/grafana/public/img/teto:ro
+      - /opt/monitoring/branding/fav32.png:/usr/share/grafana/public/build/img/fav32.png:ro
+      - /opt/monitoring/branding/apple-touch-icon.png:/usr/share/grafana/public/build/img/apple-touch-icon.png:ro
+      - /opt/monitoring/branding/teto_loading.svg:/usr/share/grafana/public/build/img/grafana_icon.svg:ro
+
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /:/host:ro,rslave
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - CADVISOR_HEALTHCHECK_URL=http://localhost:8098/healthz
+    command:
+      - '--port=8098' # 8080 is taken by qBittorrent WebUI
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+
+  exportarr-sonarr:
+    image: ghcr.io/onedr0p/exportarr:latest
+    container_name: exportarr-sonarr
+    restart: unless-stopped
+    network_mode: host
+    command: ["sonarr"]
+    environment:
+      - PORT=9707
+      - URL=http://192.168.1.10:8989
+      - APIKEY=${SONARR_API_KEY}
+
+  exportarr-radarr:
+    image: ghcr.io/onedr0p/exportarr:latest
+    container_name: exportarr-radarr
+    restart: unless-stopped
+    network_mode: host
+    command: ["radarr"]
+    environment:
+      - PORT=9708
+      - URL=http://192.168.1.10:7878
+      - APIKEY=${RADARR_API_KEY}
+
+  exportarr-prowlarr:
+    image: ghcr.io/onedr0p/exportarr:latest
+    container_name: exportarr-prowlarr
+    restart: unless-stopped
+    network_mode: host
+    command: ["prowlarr"]
+    environment:
+      - PORT=9709
+      - URL=http://192.168.1.10:9696
+      - APIKEY=${PROWLARR_API_KEY}

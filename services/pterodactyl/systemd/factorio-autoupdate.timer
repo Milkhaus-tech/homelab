@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Factorio version check
+
+[Timer]
+# 06:00 local, an hour after the 12:00 UTC in-panel world backup.
+OnCalendar=*-*-* 06:00:00
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

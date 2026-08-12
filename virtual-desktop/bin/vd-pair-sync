@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+"""Share the devices you have already paired with every league desktop.
+
+Sunshine has no "trust this network" setting — pairing is its security model, a client
+certificate exchange, and a PIN is how a device gets its certificate. What it does have is a
+per-instance list of trusted devices, so a device that paired once with your main desktop
+can simply be trusted by the others too. Pair a new phone or laptop on the primary, run
+this, and every league desktop accepts it without a PIN of its own.
+
+Each instance keeps its own uniqueid, so Moonlight still lists them as separate hosts.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+PRIMARY = Path("/home/noah/.config/sunshine/sunshine_state.json")
+HOME = Path("/home/noah/.config")
+
+
+def devices(state: dict) -> list:
+    return (state.get("root") or {}).get("named_devices") or []
+
+
+def main() -> int:
+    if not PRIMARY.exists():
+        print(f"no primary state at {PRIMARY}")
+        return 1
+    primary = json.loads(PRIMARY.read_text())
+    trusted = devices(primary)
+    if not trusted:
+        print("your primary desktop has no paired devices yet — pair one there first")
+        return 1
+
+    targets = sorted(HOME.glob("sunshine-L*/"))
+    if not targets:
+        print("no league desktops yet")
+        return 0
+
+    for directory in targets:
+        state_path = directory / "state.json"
+        if state_path.exists():
+            state = json.loads(state_path.read_text())
+        else:
+            # Keep the instance's own identity; only the trust list is shared.
+            state = {"root": {"uniqueid": f"AUDIBLE-{directory.name[-2:]}-0000-0000-000000000000"}}
+        state.setdefault("root", {})
+        # A distinct, stable identity per desktop, or Moonlight cannot tell the hosts apart
+        # in its list. Derived from the slot so it survives a rebuild of the state file.
+        if not state["root"].get("uniqueid"):
+            slot = directory.name.split("-L")[-1]
+            state["root"]["uniqueid"] = f"AUD1BLE{int(slot):02d}-0000-1000-8000-00805F9B34FB"
+        existing = {d.get("uuid"): d for d in devices(state)}
+        for device in trusted:
+            existing.setdefault(device.get("uuid"), device)
+        state["root"]["named_devices"] = list(existing.values())
+        # Web UI login travels too, so every desktop opens with the same credentials.
+        for key in ("username", "salt", "password"):
+            if primary.get(key):
+                state[key] = primary[key]
+        state_path.write_text(json.dumps(state, indent=2))
+        print(f"{directory.name}: {len(existing)} trusted device(s)")
+
+    print("\nRestart any running league desktop for this to take effect:")
+    print("  vd-league-desktop stop <slot> && vd-league-desktop start <slot>")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,206 @@
+dance_party:
+  sequence:
+  - device_id: 9809ffc7700508f7897901b4b7012a08
+    domain: select
+    entity_id: 0f284c7422e217da8e7f55d4543f20ef
+    type: select_option
+    option: Dance Party
+  - device_id: e3ee6574d65e0fd38dd2ebbea8876e27
+    domain: select
+    entity_id: c8b963ed113ec766b337c5daa681a6d6
+    type: select_option
+    option: Dance Party
+  - device_id: bbeb2bf72e7e9894ef93d44029052cb0
+    domain: select
+    entity_id: 783c5d40785b74da283277272c277428
+    type: select_option
+    option: Dance Party
+  - device_id: b09a8f67c893e788a2ce95f9c4b44d7c
+    domain: select
+    entity_id: 1d21f676eccbeb35edaa885485eb29e3
+    type: select_option
+    option: Dance Party
+  - device_id: 36a560eae4ef1cc3adc89d4a34f1e961
+    domain: select
+    entity_id: 631081b1c1d6c09786daf39ea6a0db31
+    type: select_option
+    option: Dance Party
+  - device_id: 516074e520e5e1fac6f832b0db3fecd1
+    domain: select
+    entity_id: 8234034872d6a572274411dac7ec0a30
+    type: select_option
+    option: Dance Party
+  - device_id: f1070aa8f90a524d335ca8ffc9c5c9b9
+    domain: select
+    entity_id: b473c9660dca5ccf5f8b3b7a2d2f5c9d
+    type: select_option
+    option: Dance Party
+  - device_id: c5d3a7cb4ffd8f12d322d49607763ab1
+    domain: select
+    entity_id: 54e9ba3bc419ae60e8d50fd7de2e1a10
+    type: select_option
+    option: Dance Party
+  alias: Dance Party
+  description: ''
+feed_cat_1_portion:
+  alias: Feed Cat 1 Portion
+  sequence:
+  - target:
+      entity_id: number.smart_pet_feeder_feed
+    data:
+      value: 1
+    action: number.set_value
+  description: ''
+launch_jellyfin:
+  sequence:
+  - action: androidtv.adb_command
+    target:
+      entity_id: media_player.living_room_living_room_tv
+    data:
+      command: am start -n org.jellyfin.androidtv/org.jellyfin.androidtv.ui.MainActivity
+  alias: Launch Jellyfin
+  description: ''
+ptz_left_1s:
+  alias: PTZ Left 1s
+  sequence:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_1
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: move
+          argument: left
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: stop
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_2
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: move
+          argument: left
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: stop
+ptz_right_1s:
+  alias: PTZ right 1s
+  sequence:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_1
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: move
+          argument: right
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: stop
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_2
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: move
+          argument: right
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: stop
+ptz_up_1s:
+  alias: PTZ up 1s
+  sequence:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_1
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: move
+          argument: up
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: stop
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_2
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: move
+          argument: up
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: stop
+ptz_down_1s:
+  alias: PTZ down 1s
+  sequence:
+  - choose:
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_1
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: move
+          argument: down
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_1
+          action: stop
+    - conditions:
+      - condition: state
+        entity_id: input_select.active_ptz_camera
+        state: tapo_2
+      sequence:
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: move
+          argument: down
+      - delay:
+          milliseconds: 500
+      - action: frigate.ptz
+        data:
+          entity_id: camera.tapo_2
+          action: stop

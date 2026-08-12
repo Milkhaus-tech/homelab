@@ -1,0 +1,169 @@
+#!/bin/bash
+# Audible's two virtual desktops.
+#
+#   standard  — always up. Routine work: practice drafts, waivers, lineups, anything the
+#               agent needs a signed-in browser for.
+#   warroom   — dormant. Comes up five minutes before a REAL draft and goes away after,
+#               so nothing shares a connection with the one event that cannot be redone.
+#
+# One desktop per league was the previous shape and it did not survive contact: six idle
+# Chromiums plus the docker stack drove a 32GB box into the OOM killer, which took three
+# browsers out from under their agents at once. Drafts are rare; the browsers were not.
+#
+# Display :0 / CDP 9222 / Sunshine 47989 remain Noah's, for general work.
+set -u
+
+ROLE="${2:-}"
+GEOMETRY="${VD_GEOMETRY:-1280x720}"
+SUNSHINE_USER="${VD_SUNSHINE_USER:-moonlight}"
+SUNSHINE_PASS="${VD_SUNSHINE_PASS:-changeme}"
+PRIMARY_PROFILE=/home/noah/vd-chromium
+
+usage() {
+    cat <<USAGE
+usage: vd-desktop {start|stop|status|info} [standard|warroom]
+
+  start standard     bring up the everyday desktop (idempotent)
+  start warroom      bring up the draft war room
+  stop warroom       tear it down again
+  status             what is running
+  info <role>        connection details for Moonlight
+USAGE
+    exit 2
+}
+
+paths() {
+    case "$ROLE" in
+        standard) NUM=11; ;;
+        warroom)  NUM=12; ;;
+        *) echo "role must be 'standard' or 'warroom'"; usage ;;
+    esac
+    DISPLAY_NUM=":${NUM}"
+    CDP_PORT=$((9300 + NUM))
+    SUN_PORT=$((47989 + (NUM - 10) * 1000))
+    WEB_PORT=$((SUN_PORT + 1))
+    PROFILE="/home/noah/vd-chromium-${ROLE}"
+    SUN_DIR="/home/noah/.config/sunshine-${ROLE}"
+    RUN_DIR="/home/noah/.local/state/vd-desktop/${ROLE}"
+}
+
+start() {
+    paths
+    mkdir -p "$SUN_DIR" "$RUN_DIR"
+
+    if [ -e "/tmp/.X11-unix/X${NUM}" ]; then
+        echo "display $DISPLAY_NUM already up"
+    else
+        Xvfb "$DISPLAY_NUM" -screen 0 "${GEOMETRY}x24" -nolisten tcp >"$RUN_DIR/xvfb.log" 2>&1 &
+        sleep 2
+        DISPLAY="$DISPLAY_NUM" setxkbmap us 2>/dev/null || true
+        echo "display $DISPLAY_NUM started (${GEOMETRY})"
+    fi
+
+    if ! pgrep -f "xfwm4 --display=$DISPLAY_NUM" >/dev/null 2>&1; then
+        DISPLAY="$DISPLAY_NUM" xfwm4 --display="$DISPLAY_NUM" >"$RUN_DIR/wm.log" 2>&1 &
+        sleep 1
+    fi
+
+    if [ ! -d "$PROFILE" ] && [ -d "$PRIMARY_PROFILE" ]; then
+        echo "seeding profile from $PRIMARY_PROFILE (carries the ESPN login)"
+        cp -a "$PRIMARY_PROFILE" "$PROFILE"
+        rm -f "$PROFILE/SingletonLock" "$PROFILE/SingletonCookie" "$PROFILE/SingletonSocket"
+    fi
+    if curl -s --max-time 2 "http://127.0.0.1:${CDP_PORT}/json/version" >/dev/null; then
+        echo "chromium already up (CDP 127.0.0.1:${CDP_PORT})"
+    else
+        DISPLAY="$DISPLAY_NUM" XAUTHORITY=/home/noah/.Xauthority \
+        systemd-run --user --scope --quiet --unit "snap.chromium.chromium-${ROLE}-$(date +%s)" \
+            -- /snap/bin/chromium \
+            --user-data-dir="$PROFILE" \
+            --remote-debugging-port="$CDP_PORT" \
+            --no-first-run --restore-last-session --start-maximized \
+            --window-size="${GEOMETRY/x/,}" \
+            --renderer-process-limit=2 \
+            --disable-dev-shm-usage \
+            --disable-background-networking \
+            --disable-breakpad \
+            --disable-component-update \
+            --js-flags="--max-old-space-size=384" \
+            >"$RUN_DIR/chromium.log" 2>&1 &
+        sleep 3
+        echo "chromium started (CDP 127.0.0.1:${CDP_PORT})"
+    fi
+
+    if ss -lnt 2>/dev/null | grep -q ":${SUN_PORT} "; then
+        echo "sunshine already up (port ${SUN_PORT})"
+    else
+        /home/noah/bin/vd-pair-sync >/dev/null 2>&1 || true
+        local origins
+        origins=$(sed -n 's/^csrf_allowed_origins *= *//p' /home/noah/.config/sunshine/sunshine.conf \
+            | head -1 | tr ',' '\n' | sed -E "s/:[0-9]+$/:${WEB_PORT}/" | paste -sd, -)
+        [ -n "$origins" ] || origins="https://<tailscale-ip>:${WEB_PORT},https://localhost:${WEB_PORT}"
+        cat > "$SUN_DIR/sunshine.conf" <<CONF
+port = ${SUN_PORT}
+capture = x11
+sunshine_name = Audible ${ROLE}
+file_state = ${SUN_DIR}/state.json
+log_path = ${SUN_DIR}/sunshine.log
+origin_web_ui_allowed = lan
+csrf_allowed_origins = ${origins}
+native_pen_touch = disabled
+CONF
+        DISPLAY="$DISPLAY_NUM" sunshine "$SUN_DIR/sunshine.conf" --creds "$SUNSHINE_USER" "$SUNSHINE_PASS" \
+            >"$RUN_DIR/sunshine-creds.log" 2>&1
+        DISPLAY="$DISPLAY_NUM" setsid /home/noah/bin/vd-input-bridge \
+            --display "$DISPLAY_NUM" -- sunshine "$SUN_DIR/sunshine.conf" \
+            >"$RUN_DIR/sunshine.log" 2>&1 &
+        sleep 6
+        echo "sunshine started (Moonlight ${SUN_PORT}, web ${WEB_PORT}, input bridged)"
+    fi
+    echo
+    info
+}
+
+stop() {
+    paths
+    pkill -f "vd-input-bridge --display ${DISPLAY_NUM} " 2>/dev/null
+    pkill -f "sunshine ${SUN_DIR}/sunshine.conf" 2>/dev/null
+    pkill -f "remote-debugging-port=${CDP_PORT}" 2>/dev/null
+    pkill -f "xfwm4 --display=${DISPLAY_NUM}" 2>/dev/null
+    pkill -f "Xvfb ${DISPLAY_NUM} " 2>/dev/null
+    sleep 1
+    echo "${ROLE} stopped (profile and pairings kept)"
+}
+
+info() {
+    paths
+    local host
+    host=$(tailscale ip -4 2>/dev/null | head -1)
+    [ -n "$host" ] || host=$(hostname -I | awk '{print $1}')
+    cat <<INFO
+${ROLE}
+  Moonlight     ${host}:${SUN_PORT}      (add as a manual host, with the port)
+  Web UI        https://${host}:${WEB_PORT}   (login ${SUNSHINE_USER} / ${SUNSHINE_PASS})
+  Pairing       devices paired with your main desktop work here with no PIN
+  X display     ${DISPLAY_NUM}  ${GEOMETRY}
+  Chrome CDP    127.0.0.1:${CDP_PORT}   (localhost only, never expose)
+INFO
+}
+
+status() {
+    printf '%-10s %-8s %-10s %-9s %s\n' ROLE DISPLAY CDP SUNSHINE STATE
+    for role in standard warroom; do
+        ROLE=$role; paths
+        local up=""
+        [ -e "/tmp/.X11-unix/X${NUM}" ] && up="display"
+        curl -s --max-time 1 "http://127.0.0.1:${CDP_PORT}/json/version" >/dev/null && up="$up chromium"
+        ss -lnt 2>/dev/null | grep -q ":${SUN_PORT} " && up="$up sunshine"
+        printf '%-10s %-8s %-10s %-9s %s\n' \
+            "$role" "$DISPLAY_NUM" "$CDP_PORT" "$SUN_PORT" "${up:-dormant}"
+    done
+}
+
+case "${1:-}" in
+    start)  start ;;
+    stop)   stop ;;
+    info)   info ;;
+    status) ROLE=standard; status ;;
+    *)      usage ;;
+esac

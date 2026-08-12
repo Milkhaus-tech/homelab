@@ -1,0 +1,9 @@
+#!/bin/sh
+# Push "virtual desktop needs you" to Noah's phone via the HA webhook.
+# Agents: call this when blocked on a login wall / 2FA / captcha, then stop or poll.
+REASON="${*:-agent needs attention on the virtual desktop}"
+printf '%s\t%s\n' "$(date -Is)" "$REASON" >> /home/noah/vd-attention.log
+jq -n --arg r "$REASON" '{reason:$r}' | curl -sS -m 5 -X POST \
+    -H 'Content-Type: application/json' -d @- \
+    http://192.168.1.10:8123/api/webhook/<your-webhook-id> \
+    || { echo "vd-flag: HA webhook failed" >&2; exit 1; }

@@ -1,0 +1,32 @@
+version: '3'
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - /opt/homeassist/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+      - /mnt/media/homeassistant:/media
+    restart: unless-stopped
+    network_mode: host
+  matter-bridge:
+    container_name: matter-bridge
+    image: luligu/matterbridge:latest
+    restart: always
+    network_mode: host
+    volumes:
+      - /opt/homeassist/matter-config:/root/.matterbridge
+    environment:
+      - MATTERBRIDGE_URL=http://192.168.1.10:8123
+      - TOKEN=${HA_MATTER_TOKEN} # See below to generate this
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log

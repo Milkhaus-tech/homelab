@@ -1,0 +1,205 @@
+#!/usr/bin/env python3
+"""Carry one Sunshine instance's Moonlight input into its own virtual display.
+
+Why this exists: the league desktops run on Xvfb, and Xvfb has no input stack — it never
+reads evdev, so it cannot see the uinput devices Sunshine creates for a stream. Worse, the
+real :0 Xorg hotplugs every input device on the box, so keystrokes meant for a league
+desktop were landing on the physical desktop. Video-only streams, and a leak.
+
+So this wraps the sunshine launch. Each Sunshine creates its keyboard/mouse/absolute-mouse
+trio at startup, which makes ownership deterministic: the devices that appear right after
+our child starts are ours. We take an exclusive kernel grab on them — that is what stops
+:0 receiving the events — and replay everything into our display via XTEST.
+
+Claiming stops after the startup window on purpose. Devices that appear later belong to
+someone else's session (the primary desktop creates pen/touch devices mid-stream when an
+iPhone touches it), and stealing those would break the desktop Noah is actually using.
+"""
+
+import argparse
+import glob
+import signal
+import subprocess
+import sys
+import threading
+import time
+
+import evdev
+from evdev import ecodes
+from Xlib import X, display as xdisplay
+from Xlib.ext import xtest
+
+#: Sunshine's device names all carry this. Nothing else on the box does.
+NAME_MARK = "passthrough"
+
+#: How long after our child starts we accept new devices as ours. Creation happens within
+#: a second of startup; the slack covers a slow disk, not a design doubt.
+CLAIM_WINDOW_SECONDS = 25.0
+
+#: evdev keycode -> X keycode. The +8 offset is the convention every evdev-driven X server
+#: uses; Xvfb's default map follows it for the whole pc105 range.
+KEY_OFFSET = 8
+
+BUTTONS = {
+    ecodes.BTN_LEFT: 1,
+    ecodes.BTN_MIDDLE: 2,
+    ecodes.BTN_RIGHT: 3,
+    ecodes.BTN_SIDE: 8,
+    ecodes.BTN_EXTRA: 9,
+}
+
+WHEELS = {ecodes.REL_WHEEL: (4, 5), ecodes.REL_HWHEEL: (7, 6)}
+
+
+def log(message):
+    print(f"[vd-input-bridge] {message}", flush=True)
+
+
+class Injector:
+    """One X connection, one lock: XTEST calls interleave badly across threads."""
+
+    def __init__(self, display_name):
+        self.display = xdisplay.Display(display_name)
+        screen = self.display.screen()
+        self.width = screen.width_in_pixels
+        self.height = screen.height_in_pixels
+        self.lock = threading.Lock()
+
+    def key(self, code, pressed):
+        keycode = code + KEY_OFFSET
+        if not 8 <= keycode <= 255:
+            return  # media keys past the X range; nothing on ESPN needs them
+        with self.lock:
+            xtest.fake_input(self.display,
+                             X.KeyPress if pressed else X.KeyRelease, keycode)
+            self.display.sync()
+
+    def button(self, number, pressed):
+        with self.lock:
+            xtest.fake_input(self.display,
+                             X.ButtonPress if pressed else X.ButtonRelease, number)
+            self.display.sync()
+
+    def click(self, number, times=1):
+        for _ in range(times):
+            self.button(number, True)
+            self.button(number, False)
+
+    def move_relative(self, dx, dy):
+        with self.lock:
+            xtest.fake_input(self.display, X.MotionNotify, 1, x=dx, y=dy)
+            self.display.sync()
+
+    def move_absolute(self, x, y):
+        with self.lock:
+            xtest.fake_input(self.display, X.MotionNotify, 0, x=x, y=y)
+            self.display.sync()
+
+
+def bridge_device(path, injector):
+    """Read one grabbed device forever, translating as we go."""
+    device = evdev.InputDevice(path)
+    device.grab()  # exclusive: :0 stops seeing these events, which is half the fix
+    log(f"claimed {path} ({device.name})")
+
+    absinfo = {code: info for code, info in device.capabilities().get(ecodes.EV_ABS, [])}
+    abs_x = absinfo.get(ecodes.ABS_X)
+    abs_y = absinfo.get(ecodes.ABS_Y)
+    pending = {"dx": 0, "dy": 0, "ax": None, "ay": None}
+
+    def scale(value, info, span):
+        extent = (info.max - info.min) or 1
+        return int((value - info.min) * (span - 1) / extent)
+
+    try:
+        for event in device.read_loop():
+            if event.type == ecodes.EV_KEY:
+                if event.value == 2:
+                    continue  # X handles autorepeat itself
+                if event.code in BUTTONS:
+                    injector.button(BUTTONS[event.code], bool(event.value))
+                elif event.code < ecodes.BTN_MISC:
+                    injector.key(event.code, bool(event.value))
+            elif event.type == ecodes.EV_REL:
+                if event.code == ecodes.REL_X:
+                    pending["dx"] += event.value
+                elif event.code == ecodes.REL_Y:
+                    pending["dy"] += event.value
+                elif event.code in WHEELS:
+                    up, down = WHEELS[event.code]
+                    injector.click(up if event.value > 0 else down, abs(event.value))
+            elif event.type == ecodes.EV_ABS:
+                if event.code == ecodes.ABS_X and abs_x:
+                    pending["ax"] = scale(event.value, abs_x, injector.width)
+                elif event.code == ecodes.ABS_Y and abs_y:
+                    pending["ay"] = scale(event.value, abs_y, injector.height)
+            elif event.type == ecodes.EV_SYN:
+                if pending["ax"] is not None or pending["ay"] is not None:
+                    injector.move_absolute(
+                        pending["ax"] if pending["ax"] is not None else 0,
+                        pending["ay"] if pending["ay"] is not None else 0,
+                    )
+                    pending["ax"] = pending["ay"] = None
+                if pending["dx"] or pending["dy"]:
+                    injector.move_relative(pending["dx"], pending["dy"])
+                    pending["dx"] = pending["dy"] = 0
+    except OSError as exc:
+        log(f"released {path}: {exc}")
+
+
+def device_name(path):
+    try:
+        return evdev.InputDevice(path).name
+    except OSError:
+        return ""
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--display", required=True, help="X display to inject into, e.g. :11")
+    parser.add_argument("child", nargs=argparse.REMAINDER,
+                        help="-- sunshine <conf>: the instance whose input this carries")
+    args = parser.parse_args()
+    child_argv = [a for a in args.child if a != "--"]
+    if not child_argv:
+        parser.error("give the sunshine command after --")
+
+    before = set(glob.glob("/dev/input/event*"))
+    child = subprocess.Popen(child_argv)
+    log(f"started {' '.join(child_argv)} (pid {child.pid})")
+
+    def stop(*_):
+        child.terminate()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    injector = Injector(args.display)
+    log(f"injecting into {args.display} ({injector.width}x{injector.height})")
+
+    claimed = set()
+    deadline = time.monotonic() + CLAIM_WINDOW_SECONDS
+    while time.monotonic() < deadline and child.poll() is None:
+        for path in sorted(set(glob.glob("/dev/input/event*")) - before - claimed):
+            if NAME_MARK not in device_name(path).lower():
+                continue
+            claimed.add(path)
+            threading.Thread(target=bridge_device, args=(path, injector),
+                             daemon=True, name=path).start()
+        if len(claimed) >= 3:
+            break
+        time.sleep(0.5)
+
+    if not claimed:
+        log("WARNING: no input devices appeared in the window — the stream will be video-only")
+    else:
+        log(f"claim window closed with {len(claimed)} device(s)")
+
+    child.wait()
+    log(f"sunshine exited with {child.returncode}")
+    return child.returncode or 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

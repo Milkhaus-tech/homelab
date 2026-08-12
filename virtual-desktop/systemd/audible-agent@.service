@@ -1,0 +1,18 @@
+[Unit]
+# Audible's two agents, instanced by desktop role:
+#   standard — always up, routine work for every league
+#   warroom  — woken five minutes before a real draft, bound to that one league
+Description=Audible agent (%i desktop)
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/audible/agent-%i.env
+Environment=AUDIBLE_URL=http://localhost:8888
+WorkingDirectory=/home/noah/fantasy-football-assistant
+ExecStart=/home/noah/fantasy-football-assistant/venv/bin/python scripts/audible-agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

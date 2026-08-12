@@ -1,0 +1,37 @@
+#!/bin/bash
+# Carry out the app's decision about the draft war room.
+#
+# The app decides (GET /api/war-room) and this acts, because the backend runs in a container
+# and cannot start a browser on the desktop. Runs every minute from a systemd timer: a draft
+# can be closer than the five-minute lead the first time it is seen, since joining a public
+# league starts one about two minutes later.
+set -u
+
+API="${AUDIBLE_URL:-http://localhost:8888}"
+ENV_FILE="$HOME/.config/audible/agent-warroom.env"
+
+decision=$(curl -s --max-time 10 "$API/api/war-room") || exit 0
+wanted=$(printf '%s' "$decision" | python3 -c "import json,sys;print(json.load(sys.stdin).get('wanted'))" 2>/dev/null)
+league=$(printf '%s' "$decision" | python3 -c "import json,sys;print(json.load(sys.stdin).get('league_id') or '')" 2>/dev/null)
+awake=no
+curl -s --max-time 2 http://127.0.0.1:9312/json/version >/dev/null && awake=yes
+
+if [ "$wanted" = "True" ] && [ "$awake" = "no" ]; then
+    echo "waking the war room for league $league"
+    mkdir -p "$(dirname "$ENV_FILE")"
+    cat > "$ENV_FILE" <<ENV
+VD_CDP_URL=http://127.0.0.1:9312
+VD_DESK=warroom
+DISPLAY=:12
+VD_LEAGUE_ID=${league}
+ENV
+    /home/noah/bin/vd-desktop start warroom
+    systemctl --user enable --now audible-agent@warroom.service 2>/dev/null
+    systemctl --user restart audible-agent@warroom.service
+    /home/noah/bin/vd-flag "Audible war room is up — real draft for league ${league} starting" \
+        >/dev/null 2>&1 || true
+elif [ "$wanted" != "True" ] && [ "$awake" = "yes" ]; then
+    echo "standing the war room down"
+    systemctl --user disable --now audible-agent@warroom.service 2>/dev/null
+    /home/noah/bin/vd-desktop stop warroom
+fi

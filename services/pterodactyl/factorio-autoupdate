@@ -1,0 +1,87 @@
+#!/bin/bash
+# Factorio refuses multiplayer between different builds, so an outdated server is
+# an unjoinable one. Track the current stable headless release.
+set -uo pipefail
+
+UUID=c6e63d7d-0d5e-4a85-862a-ce956c6dc2b7
+VOL=/var/lib/pterodactyl/volumes/$UUID
+BASE=http://127.0.0.1:8090/api/servers/$UUID
+STOP_WAIT=180
+INSTALL_WAIT=900
+BOOT_WAIT=300
+
+log() { logger -t factorio-autoupdate "$*"; echo "$(date -Is) $*"; }
+alert() { log "FAILED: $*"; /home/noah/bin/vd-flag "factorio auto-update failed: $*" >/dev/null 2>&1 || true; exit 1; }
+
+token=$(sed -nE 's/^[[:space:]]*token:[[:space:]]*(.+)$/\1/p' /etc/pterodactyl/config.yml | head -1)
+[ -n "$token" ] || alert "could not read wings token"
+
+# wings answers 202 for "queued", and the action can still fail asynchronously
+# (e.g. "server is currently installing"), so every step verifies against state.
+post() { curl -sS -m 30 -o /dev/null -X POST "$BASE/$1" \
+         -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$2"; }
+state() { curl -sS -m 15 "$BASE" -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.state // empty'; }
+version_now() { jq -r '.version // empty' "$VOL/data/base/info.json" 2>/dev/null; }
+
+installed=$(version_now)
+[ -n "$installed" ] || alert "cannot read installed version from data/base/info.json"
+
+stable=$(curl -sS -m 20 https://factorio.com/api/latest-releases 2>/dev/null | jq -r '.stable.headless // empty')
+# A bad fetch is transient; leave a working server alone and retry tomorrow.
+[ -n "$stable" ] || { log "factorio.com unreachable, keeping $installed"; exit 0; }
+
+[ "$installed" = "$stable" ] && { log "up to date ($installed)"; exit 0; }
+
+log "update available: $installed -> $stable"
+
+# Stop via the egg's /quit so the world is saved, rather than letting the
+# reinstall's short grace period SIGKILL a save in progress.
+if [ "$(state)" != offline ]; then
+  post power '{"action":"stop"}'
+  for _ in $(seq "$STOP_WAIT"); do
+    [ "$(docker inspect -f '{{.State.Running}}' "$UUID" 2>/dev/null || echo false)" = true ] || break
+    sleep 1
+  done
+  [ "$(docker inspect -f '{{.State.Running}}' "$UUID" 2>/dev/null || echo false)" = true ] \
+    && alert "server did not stop within ${STOP_WAIT}s"
+  log "stopped cleanly"
+fi
+
+# Hard-link snapshot of saves/: costs no space, survives the extract replacing
+# files, and is kept behind on any failure below.
+snap=$VOL/.saves-pre-$stable
+rm -rf "$snap"
+cp -al "$VOL/saves" "$snap" 2>/dev/null && log "snapshotted saves -> $(basename "$snap")"
+
+post reinstall '{}'
+
+# The extracted files land before wings finishes the install, so the version file
+# is not a completion signal on its own -- retry start until wings accepts it.
+boot_from=$(date +%s)
+started=false
+end=$((SECONDS + INSTALL_WAIT))
+while [ "$SECONDS" -lt "$end" ]; do
+  if [ "$(version_now)" = "$stable" ]; then
+    post power '{"action":"start"}'
+    sleep 5
+    case "$(state)" in running|starting) started=true; break;; esac
+  else
+    sleep 5
+  fi
+done
+[ "$started" = true ] || alert "did not reach $stable and start within ${INSTALL_WAIT}s (version $(version_now), state $(state))"
+log "installed $stable"
+
+# Scope the boot marker to this run; the pre-update log also contains it.
+booted=false
+end=$((SECONDS + BOOT_WAIT))
+while [ "$SECONDS" -lt "$end" ]; do
+  if [ "$(state)" = running ] && docker logs --since "$boot_from" "$UUID" 2>&1 | grep -q "Hosting game at"; then
+    booted=true; break
+  fi
+  sleep 5
+done
+[ "$booted" = true ] || alert "installed $stable but server did not finish booting (state $(state))"
+
+rm -rf "$snap"
+log "Factorio now on $stable and hosting"

@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (history + tree)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: pattern sweep
+        run: ./tools/verify-no-leaks.sh --patterns-only
+
+  compose-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config on every stack
+        run: |
+          set -e
+          for d in services/*/; do
+            [ -f "$d/docker-compose.yml" ] || continue
+            echo "== $d"
+            envfile=""
+            [ -f "$d/.env.example" ] && envfile="--env-file .env.example"
+            ( cd "$d" && docker compose $envfile -f docker-compose.yml config -q )
+          done
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: syntax
+        run: |
+          # extensionless python scripts listed explicitly
+          python3 -m py_compile $(git ls-files '*.py') \
+            virtual-desktop/bin/vd-pair-sync virtual-desktop/bin/vd-input-bridge
+      - name: self-tests
+        run: |
+          python3 services/media/scripts/race-reaper.py --selftest
+          python3 services/jellyfin/scripts/livetv-curate.py --selftest

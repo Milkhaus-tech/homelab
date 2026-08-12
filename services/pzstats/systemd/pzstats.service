@@ -1,0 +1,7 @@
+[Unit]
+Description=Regenerate the Project Zomboid stats page data
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/noah/pzstats/generate.py

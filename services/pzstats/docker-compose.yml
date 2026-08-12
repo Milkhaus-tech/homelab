@@ -1,0 +1,10 @@
+services:
+  pzstats:
+    image: nginx:alpine
+    container_name: pzstats
+    restart: unless-stopped
+    cpuset: "0-9"      # keep off cores 10-15, reserved for game servers
+    ports:
+      - "8089:80"
+    volumes:
+      - ./www:/usr/share/nginx/html:ro

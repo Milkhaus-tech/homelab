@@ -1,0 +1,111 @@
+# Recyclarr config — TRaSH custom formats + owns the "1080p Efficient" profile in both apps.
+# API keys live in secrets.yml. x265 (HD) is deliberately +200 here (space-efficient
+# 1080p is the goal on this box), inverting TRaSH's default -10000.
+sonarr:
+  sonarr-main:
+    base_url: http://sonarr:8989
+    api_key: !secret sonarr_apikey
+
+    quality_definition:
+      type: series
+
+    quality_profiles:
+      - name: 1080p Efficient
+        reset_unmatched_scores:
+          enabled: true
+        upgrade:
+          allowed: true
+          until_quality: WEB 1080p
+          until_score: 10000
+        min_format_score: 0
+        quality_sort: top
+        qualities:
+          - name: WEB 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+          - name: Bluray-1080p
+          - name: HDTV-1080p
+          - name: WEB 720p
+            qualities:
+              - WEBDL-720p
+              - WEBRip-720p
+          - name: Bluray-720p
+          - name: HDTV-720p
+
+    custom_formats:
+      - trash_ids:
+          - 85c61753df5da1fb2aab6f2a47426b09 # BR-DISK
+          - 9c11cd3f07101cdba90a2d81cf0e56b4 # LQ
+          - e2315f990da2e2cbfc9fa5b7a6fcfe48 # LQ (Release Title)
+          - fbcb31d8dabd2a319072b84fc0b7249c # Extras
+          - 23297a736ca77c0fc8e70f8edd7ee56c # Upscaled
+        assign_scores_to:
+          - name: Any
+          - name: 720p smart
+          - name: 720p smart - ANIME
+          - name: 720p smart - ANIME - DUBS ONLY
+          - name: 1080p Efficient
+      - trash_ids:
+          - 47435ece6b99a0b477caf360e79ba0bb # x265 (HD)
+        assign_scores_to:
+          - name: 1080p Efficient
+            score: 200
+      - trash_ids:
+          - ec8fa7296b64e8cd390a1600981f3923 # Repack/Proper
+        assign_scores_to:
+          - name: 1080p Efficient
+
+radarr:
+  radarr-main:
+    base_url: http://radarr:7878
+    api_key: !secret radarr_apikey
+
+    quality_definition:
+      type: movie
+
+    quality_profiles:
+      - name: 1080p Efficient
+        reset_unmatched_scores:
+          enabled: true
+        upgrade:
+          allowed: true
+          until_quality: WEB 1080p
+          until_score: 10000
+        min_format_score: 0
+        quality_sort: top
+        qualities:
+          - name: WEB 1080p
+            qualities:
+              - WEBDL-1080p
+              - WEBRip-1080p
+          - name: Bluray-1080p
+          - name: HDTV-1080p
+          - name: WEB 720p
+            qualities:
+              - WEBDL-720p
+              - WEBRip-720p
+          - name: Bluray-720p
+          - name: HDTV-720p
+
+    custom_formats:
+      - trash_ids:
+          - ed38b889b31be83fda192888e2286d83 # BR-DISK
+          - 90a6f9a284dff5103f6346090e6280c8 # LQ
+          - e204b80c87be9497a8a6eaff48f72905 # LQ (Release Title)
+          - b8cd450cbfa689c0259a01d9e29ba3d6 # 3D
+          - 0a3f082873eb454bde444150b70253cc # Extras
+          - bfd8eb01832d646a0a89c4deb46f8564 # Upscaled
+        assign_scores_to:
+          - name: HD-720p
+          - name: 720p-Smart
+          - name: 1080p Efficient
+      - trash_ids:
+          - dc98083864ea246d05a42df0d05f81cc # x265 (HD)
+        assign_scores_to:
+          - name: 1080p Efficient
+            score: 200
+      - trash_ids:
+          - e7718d7a3ce595f289bfee26adc178f5 # Repack/Proper
+        assign_scores_to:
+          - name: 1080p Efficient

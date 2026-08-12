@@ -1,0 +1,7 @@
+[Unit]
+Description=Carry out Audible's war-room decision
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/noah/bin/audible-warroom

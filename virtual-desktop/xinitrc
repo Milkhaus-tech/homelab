@@ -1,0 +1,9 @@
+#!/bin/sh
+xset s off -dpms
+# startx never activates graphical-session.target, so start Sunshine here
+systemctl --user restart sunshine.service &
+
+# Teto desktop: restore the wallpaper (minimal XFCE has no xfdesktop to do it).
+[ -x "$HOME/.fehbg" ] && "$HOME/.fehbg" &
+
+exec startxfce4

@@ -1,0 +1,26 @@
+services:
+  jellyfin:
+    cpuset: "0-9"    # keep off cores 10-15, reserved for game servers
+    image: jellyfin/jellyfin:10.11.11
+    container_name: jellyfin
+    network_mode: bridge
+    ports:
+      - "8096:8096"
+      - "8920:8920"
+    volumes:
+      - ./config:/config
+      - ./cache:/cache
+      - /mnt/media:/media
+    restart: always
+    # THIS PART IS REQUIRED FOR THE GPU TO WORK:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video, utility]
+    environment:
+      - TZ=America/Los_Angeles
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all

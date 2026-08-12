@@ -1,0 +1,377 @@
+go2rtc:
+  api:
+    listen: :1984
+  webrtc:
+    candidates:
+      - 192.168.1.10:8555
+      - stun:8555
+  streams:
+    tapo_1:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.201/stream1
+    tapo_1_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.201/stream2
+    tapo_2:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.202/stream1
+    tapo_2_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.202/stream2
+    tapo_3:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.203/stream1
+    tapo_3_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.203/stream2
+    tapo_4:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.204/stream1
+    tapo_4_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.204/stream2
+    tapo_5:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.205/stream1
+    tapo_5_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.205/stream2
+    tapo_door:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.206/stream1
+    tapo_door_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.206/stream2
+    tapo_grg:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.207/stream1
+    tapo_grg_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.207/stream2
+    tapo_8:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.208/stream1
+    tapo_8_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.208/stream2
+    tapo_9:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.209/stream1
+    tapo_9_sub:
+      - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.209/stream2
+mqtt:
+  enabled: true
+  host: 192.168.1.10
+  port: 1883
+  user: mqtt
+  password: '{FRIGATE_MQTT_PASSWORD}'
+
+ffmpeg:
+  global_args: -hide_banner -loglevel warning
+  hwaccel_args: preset-nvidia
+  output_args:
+    record: -f segment -segment_time 10 -segment_format mp4 -reset_timestamps 1 
+      -strftime 1 -c:v copy -c:a aac -ar 44100 -ac 1
+    detect: -f rawvideo -pix_fmt yuv420p
+
+detectors:
+  onnx:
+    type: onnx
+
+model:
+  model_type: yolox
+  width: 416
+  height: 416
+  input_tensor: nchw
+  input_dtype: float_denorm
+  path: /config/model_cache/onnx/yolox_nano.onnx
+  labelmap_path: /labelmap/coco-80.txt
+
+objects:
+  track:
+    - cat
+    - person
+  filters:
+    cat:
+      min_score: 0.5
+      threshold: 0.7
+      min_area: 1000
+    person:
+      min_score: 0.4
+      threshold: 0.6
+      min_area: 5000
+
+cameras:
+  tapo_1:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_1
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_1_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.201
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+
+  tapo_2:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_2
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_2_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.202
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+
+  tapo_3:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_3
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_3_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.203
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    objects:
+      track:
+        - cat
+        - person
+      filters:
+        cat:
+          min_score: 0.2
+          threshold: 0.35
+          min_area: 500
+        person:
+          min_score: 0.4
+          threshold: 0.6
+          min_area: 5000
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+
+  tapo_4:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_4
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_4_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.204
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+
+  tapo_5:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_5
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_5_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.205
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+  tapo_door:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_door
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_door_sub
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+  tapo_grg:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_grg
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_grg_sub
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+  tapo_8:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_8
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_8_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.208
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+
+  tapo_9:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_9
+          roles:
+            - record
+        - path: rtsp://127.0.0.1:8554/tapo_9_sub
+          roles:
+            - detect
+    onvif:
+      host: 192.168.1.209
+      port: 2020
+      user: '{FRIGATE_CAMERA_USER}'
+      password: '{FRIGATE_CAMERA_PASSWORD}'
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    record:
+      enabled: true
+      continuous:
+        days: 7
+      motion:
+        days: 0
+    snapshots:
+      enabled: true
+      retain:
+        default: 7
+logger:
+  default: warning
+  logs:
+    frigate.record: info
+version: 0.17-0
+camera_groups:
+  Group:
+    order: 1
+    icon: LuAlarmClock
+    cameras:
+      - tapo_1
+      - tapo_2
+      - tapo_3
+      - tapo_4
+      - tapo_5
+      - tapo_door
+      - tapo_grg
+  Birdseye:
+    order: 2
+    icon: LuBird
+    cameras: birdseye

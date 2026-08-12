@@ -1,0 +1,24 @@
+#!/bin/bash
+# Audible's desktops: the everyday one, and the draft war room.
+#
+# The standard desktop is always up and does routine work for every league. The war room is
+# dormant and the backend wakes it five minutes before a real draft — see app/war_room.py.
+# Desktop :0 / CDP 9222 / Sunshine 47989 remain Noah's for general work.
+set -u
+
+case "${1:-sync}" in
+    sync)
+        /home/noah/bin/vd-desktop start standard
+        systemctl --user enable --now audible-agent@standard.service 2>/dev/null
+        systemctl --user restart audible-agent@standard.service
+        echo "standard agent: $(systemctl --user is-active audible-agent@standard.service)"
+        echo
+        echo "war room stays dormant until a real draft is five minutes out."
+        ;;
+    status)
+        /home/noah/bin/vd-desktop status
+        systemctl --user list-units 'audible-agent@*' --no-legend --plain 2>/dev/null \
+            | awk '{print "  " $1, $3, $4}'
+        ;;
+    *) echo "usage: audible-desktops {sync|status}"; exit 2 ;;
+esac

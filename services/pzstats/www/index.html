@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TETO ZONE — Project Zomboid server</title>
+
+<!-- Discord / Slack / iMessage unfurl. Without these a pasted link is a bare URL. -->
+<meta property="og:site_name" content="MilkHaus">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pz.milkhaus.net/">
+<meta property="og:title" content="TETO ZONE — Project Zomboid">
+<meta property="og:description" content="Live player stats, survival times, skills and outfits. Play inside of Project Zomboid: pz.milkhaus.net">
+<meta property="og:image" content="https://pz.milkhaus.net/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TETO ZONE — Project Zomboid server">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TETO ZONE — Project Zomboid">
+<meta name="twitter:description" content="Live player stats, survival times and outfits.">
+<meta name="twitter:image" content="https://pz.milkhaus.net/og.png">
+<meta name="theme-color" content="#e21e37">
+<meta name="description" content="Live stats for the TETO ZONE Project Zomboid server.">
+<link rel="icon" href="teto-shocked.png">
+
+<style>
+  :root{
+    --bg:#0b0c0e; --panel:#141619; --line:#23262b; --line-soft:#1b1e22;
+    --ink:#e8eaed; --ink-2:#a8aeb6; --ink-3:#6d7480;
+    --red:#e21e37; --red-l:#ff5c6c; --green:#3fbf6f; --amber:#d9a441;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55}
+  .wrap{max-width:62rem;margin:0 auto;padding:2.5rem 1.25rem 4rem;display:flex;flex-direction:column;gap:2rem}
+
+  /* ---------- header ---------- */
+  header{display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;
+         border-bottom:2px solid var(--red);padding-bottom:1.1rem}
+  h1{margin:0;font-family:var(--mono);font-size:clamp(1.6rem,5vw,2.4rem);font-weight:600;letter-spacing:-.02em}
+  h1 .z{color:var(--red)}
+  .sub{margin:.35rem 0 0;color:var(--ink-2);font-size:.95rem}
+  .peek{width:92px;height:92px;border-radius:10px;object-fit:cover;object-position:50% 32%;
+        border:1px solid var(--line);flex:none}
+  .status{display:flex;align-items:center;gap:.55rem;font-family:var(--mono);font-size:.85rem;margin-top:.5rem}
+  .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--ink-3);flex:none}
+  .dot.up{background:var(--green);box-shadow:0 0 0 3px rgba(63,191,111,.18)}
+  .dot.down{background:var(--red)}
+
+  /* ---------- connect callout ---------- */
+  .connect{background:radial-gradient(120% 140% at 12% 0%, #1a1216 0%, var(--panel) 60%);
+           border:1px solid var(--line);border-left:3px solid var(--red);
+           padding:1.4rem 1.35rem;display:grid;grid-template-columns:1fr auto;gap:1.25rem;align-items:center}
+  .connect .lead{font-size:1.02rem;color:var(--ink-2);margin:0 0 .7rem}
+  .connect .lead b{color:var(--ink);font-weight:650}
+
+  .ipwrap{display:inline-flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+  .ip{position:relative;display:inline-block;font-family:var(--mono);font-weight:700;
+      font-size:clamp(1.15rem,3.6vw,1.65rem);letter-spacing:.04em;color:#fff;
+      padding:.42rem .95rem;border:1px solid #3a2026;border-radius:4px;background:#120e10;
+      text-shadow:0 0 6px rgba(255,92,108,.55), 0 0 18px rgba(226,30,55,.35);
+      animation:hum 3.4s ease-in-out infinite}
+  /* animated corner brackets */
+  .ip::before,.ip::after{content:"";position:absolute;width:12px;height:12px;border:2px solid var(--red);
+      animation:pulse 2.2s ease-in-out infinite}
+  .ip::before{top:-4px;left:-4px;border-right:0;border-bottom:0}
+  .ip::after{bottom:-4px;right:-4px;border-left:0;border-top:0}
+  /* chromatic-aberration ghosts, driven by the same text via data-ip */
+  .ip .ghost{position:absolute;inset:.42rem .95rem;pointer-events:none;opacity:.55}
+  .ip .ghost.r{color:#ff2d46;transform:translateX(-1px);mix-blend-mode:screen;animation:jitterA 4.1s steps(1) infinite}
+  .ip .ghost.c{color:#28e0ff;transform:translateX(1px);mix-blend-mode:screen;animation:jitterB 5.3s steps(1) infinite}
+  /* sweeping shimmer */
+  .ip .sheen{position:absolute;inset:0;overflow:hidden;border-radius:4px;pointer-events:none}
+  .ip .sheen i{position:absolute;top:0;bottom:0;width:38%;
+      background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);
+      transform:translateX(-140%);animation:sweep 4.6s ease-in-out infinite}
+
+  @keyframes hum{0%,100%{box-shadow:0 0 0 rgba(226,30,55,0)}50%{box-shadow:0 0 22px rgba(226,30,55,.28)}}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}
+  @keyframes sweep{0%{transform:translateX(-140%)}55%,100%{transform:translateX(340%)}}
+  @keyframes jitterA{0%,92%{transform:translateX(-1px)}94%{transform:translate(-3px,1px)}96%{transform:translate(2px,-1px)}98%{transform:translateX(-1px)}}
+  @keyframes jitterB{0%,90%{transform:translateX(1px)}93%{transform:translate(3px,-1px)}95%{transform:translate(-2px,1px)}97%{transform:translateX(1px)}}
+
+  .copy{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;
+        background:#20242a;color:var(--ink-2);border:1px solid var(--line);border-radius:3px;
+        padding:.45rem .7rem;cursor:pointer}
+  .copy:hover{color:var(--ink);border-color:var(--red)}
+  .copy.done{color:var(--green);border-color:var(--green)}
+  .hint{margin:.7rem 0 0;font-size:.8rem;color:var(--ink-3)}
+  .dance{width:190px;border-radius:8px;border:1px solid var(--line);display:block}
+
+  /* ---------- cards + table ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:.8rem}
+  .card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);
+        padding:.85rem 1rem;display:flex;flex-direction:column;gap:.15rem}
+  .card .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+  .card .v{font-size:1.5rem;font-weight:650;font-variant-numeric:tabular-nums}
+  .card .n{font-size:.75rem;color:var(--ink-3)}
+  h2{margin:0 0 .1rem;font-family:var(--mono);font-size:1rem;font-weight:600;
+     padding-bottom:.5rem;border-bottom:1px solid var(--line)}
+  .scroller{overflow-x:auto;border:1px solid var(--line);background:var(--panel)}
+  table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:36rem}
+  th,td{text-align:left;padding:.6rem .8rem;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  thead th{font-family:var(--mono);font-size:.66rem;letter-spacing:.11em;text-transform:uppercase;
+           color:var(--ink-3);background:#181b1f;border-bottom:1px solid var(--line);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .who{font-weight:650}
+  td.av{width:52px;padding-right:0;line-height:0}
+  td.av svg{border-radius:4px;border:1px solid var(--line)}
+  .fit{font-size:.7rem;color:var(--ink-3);margin-top:.15rem;max-width:15rem}
+  /* cross-promo to the other server */
+  .other{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;
+         background:var(--panel);border:1px solid var(--line);border-left:3px solid #3fbf6f;
+         padding:1rem 1.15rem;text-decoration:none;color:inherit}
+  .other:hover{border-color:#3fbf6f}
+  .other img{width:56px;height:56px;border-radius:8px;object-fit:cover;object-position:50% 32%}
+  .other .t{font-weight:650;display:block}
+  .other .d{font-size:.82rem;color:var(--ink-3);display:block}
+  .other .go{font-family:var(--mono);font-size:.72rem;color:#3fbf6f;white-space:nowrap}
+  .skills{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.25rem}
+  .skill{font-family:var(--mono);font-size:.68rem;padding:.1rem .35rem;border-radius:2px;
+         background:#20242a;color:var(--ink-2);white-space:nowrap}
+  .skill b{color:var(--red-l);font-weight:600}
+  .bar{height:4px;background:#22262c;border-radius:2px;overflow:hidden;margin-top:.35rem;min-width:6rem}
+  .bar i{display:block;height:100%;background:var(--red)}
+
+  footer{color:var(--ink-3);font-size:.78rem;font-family:var(--mono);
+         border-top:1px solid var(--line);padding-top:1rem;display:flex;flex-direction:column;gap:.35rem}
+  footer a{color:var(--ink-3)}
+  .err{color:var(--amber)}
+
+  @media (max-width:640px){
+    .connect{grid-template-columns:1fr}
+    .dance{width:100%;max-width:260px}
+    .peek{width:66px;height:66px}
+    th:nth-child(5),td:nth-child(5){display:none}
+    .other{grid-template-columns:auto 1fr}
+    .other .go{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ip,.ip::before,.ip::after,.ip .ghost,.ip .sheen i{animation:none}
+    .ip .ghost{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>TETO <span class="z">ZONE</span></h1>
+      <p class="sub">Project Zomboid · always on</p>
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">checking…</span></div>
+    </div>
+    <img class="peek" src="teto-shocked.png" alt="Kasane Teto, alarmed">
+  </header>
+
+  <section class="connect">
+    <div>
+      <p class="lead"><b>Play inside of Project Zomboid!</b></p>
+      <div class="ipwrap">
+        <span class="ip" id="ip">
+          pz.milkhaus.net
+          <span class="ghost r" aria-hidden="true">pz.milkhaus.net</span>
+          <span class="ghost c" aria-hidden="true">pz.milkhaus.net</span>
+          <span class="sheen" aria-hidden="true"><i></i></span>
+        </span>
+        <button class="copy" id="copy" type="button">copy</button>
+      </div>
+      <p class="hint">Join a Server → paste the address → no port needed.</p>
+    </div>
+    <video class="dance" src="teto-dance.mp4" poster="" autoplay loop muted playsinline
+           aria-label="Kasane Teto dancing"
+           onerror="this.outerHTML='&lt;img class=&quot;dance&quot; src=&quot;teto-dance.gif&quot; alt=&quot;Kasane Teto dancing&quot; loading=&quot;lazy&quot;&gt;'"></video>
+  </section>
+
+  <section class="cards" id="cards"></section>
+
+  <section>
+    <h2>Survivors</h2>
+    <div class="scroller">
+      <table>
+        <thead><tr>
+          <th colspan="2">Survivor</th><th class="num">Playtime</th><th class="num">Survived</th>
+          <th class="num">Sessions</th><th>Skills</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="6">loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <a class="other" href="https://mc.milkhaus.net/">
+    <img src="teto-shocked.png" alt="">
+    <span>
+      <span class="t">We also run Minecraft — MILKHAUS</span>
+      <span class="d">Paper 26.1.2 with the usual quality-of-life plugins. Whitelisted via Discord.</span>
+    </span>
+    <span class="go">mc.milkhaus.net →</span>
+  </a>
+
+  <footer>
+    <span id="foot">—</span>
+    <span>Teto artwork from <a href="https://commons.wikimedia.org/wiki/File:BIRDBRAIN_(w_OK_Glass)_feat._Kasane_Teto.webm">BIRDBRAIN</a> by Jamie Paige, CC BY 3.0.</span>
+  </footer>
+</div>
+
+<script>
+const fmt = n => (n ?? 0).toLocaleString();
+const card = (k,v,n) => `<div class="card"><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n||""}</span></div>`;
+
+document.getElementById("copy").addEventListener("click", async () => {
+  const btn = document.getElementById("copy");
+  try{
+    await navigator.clipboard.writeText("pz.milkhaus.net");
+    btn.textContent = "copied"; btn.classList.add("done");
+  }catch{
+    btn.textContent = "select it"; // clipboard blocked (insecure context / permissions)
+  }
+  setTimeout(()=>{ btn.textContent="copy"; btn.classList.remove("done"); }, 2000);
+});
+
+function render(d){
+  const s = d.server || {};
+  const dot = document.getElementById("dot");
+  dot.className = "dot " + (s.online ? "up" : "down");
+  document.getElementById("statusText").textContent = s.online
+    ? `online — ${s.players}/${s.max} playing right now`
+    : "offline";
+
+  const w = d.world || {};
+  const top = [...(d.players||[])].sort((a,b)=>b.hours_survived-a.hours_survived)[0];
+  document.getElementById("cards").innerHTML = [
+    card("Online now", s.online ? `${s.players}` : "—", s.online ? `of ${s.max} slots` : "server down"),
+    card("Survivors", fmt((d.players||[]).length), "characters made"),
+    card("Total playtime", `${fmt(w.combined_playtime_hours)}h`, "across everyone"),
+    card("Longest survival", top ? `${fmt(top.hours_survived)}h` : "—", top ? top.name : ""),
+    card("World size", `${fmt(w.size_mb)} MB`, `${fmt(w.chunks)} chunk files`)
+  ].join("");
+
+  const max = Math.max(...(d.players||[]).map(p=>p.playtime_hours), 1);
+  document.getElementById("rows").innerHTML = (d.players||[]).map(p=>{
+    const sk = Object.entries(p.skills||{})
+      .map(([k,v])=>`<span class="skill">${k} <b>${v}</b></span>`).join("")
+      || '<span class="skill">none yet</span>';
+    const pct = Math.round(100*p.playtime_hours/max);
+    return `<tr>
+      <td class="av" title="${(p.outfit||[]).join(' · ')}">${p.avatar||""}</td>
+      <td><span class="who">${p.name}</span>
+          <div class="fit">${(p.outfit||[]).slice(0,3).join(' · ')}</div>
+          <div class="bar"><i style="width:${pct}%"></i></div></td>
+      <td class="num">${p.playtime_hours}h</td>
+      <td class="num">${p.hours_survived}h</td>
+      <td class="num">${p.sessions}</td>
+      <td><div class="skills">${sk}</div></td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="6">nobody has played yet</td></tr>';
+
+  const when = d.generated ? new Date(d.generated) : null;
+  document.getElementById("foot").textContent =
+    "updated " + (when ? when.toLocaleString() : "—") + " · refreshes every 60s";
+}
+
+async function tick(){
+  try{
+    const r = await fetch("stats.json?t=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    render(await r.json());
+  }catch(e){
+    document.getElementById("foot").innerHTML =
+      '<span class="err">could not load stats (' + e.message + ')</span>';
+  }
+}
+tick();
+setInterval(tick, 60000);
+</script>
+</body>
+</html>

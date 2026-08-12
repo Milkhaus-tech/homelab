@@ -1,0 +1,499 @@
+- id: '1781741606110'
+  alias: Away on Leave
+  description: Sets ecobee to away comfort state when everyone leaves the house
+  triggers:
+  - trigger: zone.left
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - trigger: zone.left
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - trigger: zone.entered
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.work
+  - trigger: zone.entered
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.work
+  - trigger: state
+    entity_id:
+    - binary_sensor.192_168_1_100
+    to:
+    - 'off'
+  - trigger: zone.occupancy_cleared
+    options:
+      for: 00:00:00
+      zone: zone.home
+  conditions:
+  - condition: zone.occupancy_is_not_detected
+    options:
+      for: 00:00:00
+      zone: zone.home
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: away
+  mode: single
+- id: '1781741845560'
+  alias: 'Cool on home '
+  description: ''
+  triggers:
+  - trigger: zone.left
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.work
+  - trigger: zone.left
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.work
+  - trigger: zone.entered
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - trigger: zone.entered
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - trigger: zone.occupancy_detected
+    options:
+      for: 00:00:00
+      zone: zone.home
+  conditions:
+  - condition: time
+    after: '21:00:00'
+    before: '18:00:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sun
+    - sat
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: home
+  mode: single
+- id: '1781742505038'
+  alias: 1 1/2 Hour Precool
+  description: ''
+  triggers:
+  - trigger: time
+    at: '16:30:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sat
+    - sun
+  conditions: []
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: sleep
+  mode: single
+- id: '1781742677869'
+  alias: Away if Not Home @ 9PM
+  description: ''
+  triggers:
+  - trigger: time
+    at: '21:01:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sun
+    - sat
+  conditions:
+  - condition: zone.not_in_zone
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - condition: zone.not_in_zone
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.home
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: away
+  mode: single
+- id: '1781772442517'
+  alias: On when Arrive Home
+  description: ''
+  triggers:
+  - trigger: zone.entered
+    target:
+      entity_id: person.noah
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - trigger: zone.entered
+    target:
+      entity_id: person.partner
+    options:
+      for: 00:00:00
+      zone: zone.home
+  conditions: []
+  actions:
+  - type: turn_on
+    device_id: c2f4e48d6cd0b16b7477b1c30ded36cf
+    entity_id: 043301e77c9cf9e6ff894251f1e391fa
+    domain: remote
+  - action: light.turn_on
+    metadata: {}
+    target:
+      area_id:
+      - kitchen
+      - living_room
+    data: {}
+  mode: single
+- id: '1781772601696'
+  alias: Lights off Sunrise
+  description: ''
+  triggers:
+  - trigger: sun
+    event: sunrise
+    offset: 01:00:00
+  conditions: []
+  actions:
+  - action: light.turn_off
+    metadata: {}
+    target:
+      area_id:
+      - living_room
+      - kitchen
+    data: {}
+  mode: single
+- id: '1781829069343'
+  alias: Check if Away
+  description: Polls every 15s so an away transition still happens if the zone trigger
+    is missed. The "not already away" condition is what stops it re-sending on every
+    tick and overriding a manual thermostat change.
+  triggers:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: current_option_changed
+    trigger: device
+    from: away
+    to: home
+    for:
+      hours: 0
+      minutes: 45
+      seconds: 0
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: current_option_changed
+    trigger: device
+    from: away
+    to: sleep
+    for:
+      hours: 0
+      minutes: 45
+      seconds: 0
+  - trigger: time_pattern
+    seconds: /15
+  conditions:
+  - condition: zone.occupancy_is_not_detected
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - condition: time
+    after: '21:00:00'
+    before: '18:00:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sun
+    - sat
+  - condition: time
+    after: '17:59:00'
+    before: '16:30:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sun
+    - sat
+  - condition: not
+    conditions:
+    - condition: device
+      device_id: 9bd7df2aa66155f9449e04ca66efb33b
+      domain: select
+      entity_id: b23294749e4bc20810123958161f04ed
+      type: selected_option
+      option: away
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: away
+  mode: single
+- id: '1781854735117'
+  alias: Morning Water
+  description: ''
+  triggers:
+  - trigger: time
+    at: 06:00:00
+    weekday:
+    - sun
+    - tue
+    - mon
+    - wed
+    - thu
+    - fri
+    - sat
+  conditions: []
+  actions:
+  - action: switch.turn_on
+    target:
+      entity_id: switch.backyard_tp_link_smart_plug_pump_1
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 2
+      seconds: 0
+      milliseconds: 0
+  - action: switch.turn_off
+    target:
+      entity_id:
+      - switch.backyard_tp_link_smart_plug_pump_1
+    data: {}
+  mode: single
+- id: '1781854907075'
+  alias: Recovery Water
+  description: ''
+  triggers:
+  - trigger: time
+    at: '19:30:00'
+    weekday:
+    - sun
+    - tue
+    - mon
+    - wed
+    - thu
+    - fri
+    - sat
+  conditions: []
+  actions:
+  - action: switch.turn_on
+    target:
+      entity_id: switch.backyard_tp_link_smart_plug_pump_1
+    data: {}
+  - delay:
+      hours: 0
+      minutes: 2
+      seconds: 0
+      milliseconds: 0
+  - action: switch.turn_off
+    target:
+      entity_id:
+      - switch.backyard_tp_link_smart_plug_pump_1
+    data: {}
+  mode: single
+- id: '1782123219661'
+  alias: Check if Home
+  description: Recovery poller for a missed home transition. Weekday list must stay
+    in sync with "Check if Away" — when this ran mon-fri only, an away state set on
+    Friday night persisted all weekend.
+  triggers:
+  - trigger: time_pattern
+    seconds: /30
+  - type: connected
+    device_id: d72805ac47c71d482fc334f5c975703f
+    entity_id: 73f5b7d1e6e3027f7a3f7dd9a8fdd8c9
+    domain: binary_sensor
+    trigger: device
+  conditions:
+  - condition: zone.occupancy_is_detected
+    options:
+      for: 00:00:00
+      zone: zone.home
+  - condition: time
+    before: '18:00:00'
+    after: '21:00:00'
+    weekday:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sun
+    - sat
+  - condition: device
+    device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: selected_option
+    option: away
+  actions:
+  - device_id: 9bd7df2aa66155f9449e04ca66efb33b
+    domain: select
+    entity_id: b23294749e4bc20810123958161f04ed
+    type: select_option
+    option: home
+  mode: single
+- id: pump_failsafe_off
+  alias: Pump failsafe off
+  description: Backstop for Morning Water and Recovery Water. Their 2-minute delay
+    lives in memory, so a restart or reload mid-run drops the turn_off and leaves the
+    pump running indefinitely. The start trigger catches a pump already on when HA
+    comes back; the 5-minute state trigger catches every other way it gets stuck,
+    including a manual turn-on that is never turned off.
+  triggers:
+  - trigger: state
+    entity_id:
+    - switch.backyard_tp_link_smart_plug_pump_1
+    to: 'on'
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  - trigger: homeassistant
+    event: start
+  conditions:
+  - condition: state
+    entity_id: switch.backyard_tp_link_smart_plug_pump_1
+    state: 'on'
+  actions:
+  - action: switch.turn_off
+    target:
+      entity_id: switch.backyard_tp_link_smart_plug_pump_1
+    data: {}
+  mode: single
+- id: doorbell_simple_record
+  alias: D205 Record on Wake
+  description: ''
+  triggers:
+  - trigger: state
+    entity_id:
+    - select.tapodoorbell_motion_detection
+    to:
+    - 'on'
+  conditions: []
+  actions:
+  - delay:
+      seconds: 3
+  - action: camera.record
+    data:
+      filename: /media/doorbell/{{ now().strftime('%Y%m%d_%H%M%S') }}.mp4
+      duration: 20
+      lookback: 3
+    target:
+      entity_id: camera.tapodoorbell_hd_stream_direct
+  - action: camera.snapshot
+    data:
+      entity_id: camera.tapodoorbell_hd_stream_direct
+      filename: /config/www/doorbell_latest.jpg
+  - action: notify.mobile_app_apple_square_v2
+    data:
+      title: Doorbell
+      message: Motion at the front door
+      data:
+        image: /local/doorbell_latest.jpg
+  - action: notify.mobile_app_partner_iphone
+    data:
+      title: Doorbell
+      message: Motion at the front door
+      data:
+        image: /local/doorbell_latest.jpg
+  mode: queued
+  max: 5
+- id: donetick_chore_notifications
+  alias: 'Chore Chart: Donetick notifications'
+  description: Relays Donetick chore webhook events (reminders and completions) to phones
+  triggers:
+  - trigger: webhook
+    webhook_id: <redacted>
+    allowed_methods:
+    - POST
+    local_only: true
+  conditions: []
+  actions:
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.json.type == 'task.reminder' }}"
+      sequence:
+      - action: notify.mobile_app_{{ 'partner_iphone' if trigger.json.data.assignee_username == 'partner' else 'apple_square_v2' }}
+        data:
+          title: "{{ {'pre_due': 'Chore coming up', 'due': 'Chore due', 'overdue': 'Chore overdue'}.get(trigger.json.data.type, 'Chore reminder') }}"
+          message: '{{ trigger.json.data.name }}'
+          data:
+            url: http://192.168.1.10:2021/chores
+    - conditions:
+      - condition: template
+        value_template: "{{ trigger.json.type == 'task.completed' }}"
+      sequence:
+      - action: notify.mobile_app_{{ 'partner_iphone' if trigger.json.data.username == 'noah' else 'apple_square_v2' }}
+        data:
+          title: Chore done ✓
+          message: '{{ trigger.json.data.display_name }} finished: {{ trigger.json.data.chore.name }}'
+          data:
+            url: http://192.168.1.10:2021/chores
+  mode: queued
+  max: 10
+- id: vd_attention
+  alias: 'Virtual desktop: needs attention'
+  description: Relays vd-flag webhooks (agent blocked on login/2FA/captcha) to Noah's phone
+  triggers:
+  - trigger: webhook
+    webhook_id: <redacted>
+    allowed_methods:
+    - POST
+    local_only: true
+  conditions: []
+  actions:
+  - action: notify.mobile_app_apple_square_v2
+    data:
+      title: Virtual desktop needs you
+      message: "{{ trigger.json.reason | default('(no reason given)') }}"
+      data:
+        push:
+          interruption-level: time-sensitive
+  mode: queued
+  max: 10

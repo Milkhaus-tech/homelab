@@ -1,0 +1,18 @@
+#!/bin/sh
+# Launch (or reuse) the virtual-desktop Chromium with CDP open for agents.
+# Profile must be non-hidden under $HOME (snap confinement) and non-default (CDP requirement).
+PROFILE=/home/noah/vd-chromium
+# Port check, not pgrep: cmdline matching false-positives on shells quoting the path.
+if curl -s --max-time 2 http://127.0.0.1:9222/json/version >/dev/null; then
+    echo "already running (CDP 127.0.0.1:9222)"
+    exit 0
+fi
+export DISPLAY=:0 XAUTHORITY=/home/noah/.Xauthority
+# snap.chromium.* scope name: snap refuses plain launches from ssh/agent session cgroups
+systemd-run --user --scope --quiet --unit "snap.chromium.chromium-vd$(date +%s)" \
+    -- /snap/bin/chromium \
+    --user-data-dir="$PROFILE" \
+    --remote-debugging-port=9222 \
+    --no-first-run --restore-last-session --start-maximized \
+    >/home/noah/vd-chromium.launch.log 2>&1 &
+echo "launched (CDP 127.0.0.1:9222)"

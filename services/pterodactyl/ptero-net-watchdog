@@ -1,0 +1,7 @@
+#!/bin/sh
+# wings creates pterodactyl_nw only at its own startup; if the network is deleted
+# (e.g. docker system prune), every game-server start fails until wings restarts.
+docker info >/dev/null 2>&1 || exit 0
+docker network inspect pterodactyl_nw >/dev/null 2>&1 && exit 0
+logger -t ptero-net-watchdog "pterodactyl_nw missing - restarting wings to recreate it"
+exec systemctl restart wings

@@ -1,0 +1,15 @@
+services:
+  donetick:
+    image: donetick/donetick:v0.1.76
+    container_name: donetick
+    restart: unless-stopped
+    ports:
+      - "2021:2021"
+    volumes:
+      - ./data:/donetick-data
+      - ./config:/config
+    environment:
+      - TZ=America/Los_Angeles
+      - DT_ENV=selfhosted
+      - DT_SQLITE_PATH=/donetick-data/donetick.db
+      - DT_JWT_SECRET=${DT_JWT_SECRET}

@@ -1,0 +1,25 @@
+# ── secrets: never in this repo ─────────────────────────────
+.env
+*.env
+secrets.yml
+tools/.private-tokens
+*.key
+*.pem
+
+# ── runtime data that lives next to configs ─────────────────
+services/filebrowser/filebrowser.db
+services/pzstats/www/stats.json
+services/pzstats/www/*.png
+services/pzstats/www/*.gif
+services/eraser
+*.db
+*.db-shm
+*.db-wal
+
+# ── junk ────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.log
+*.bak
+*.tmp
+.DS_Store

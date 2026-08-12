@@ -1,0 +1,29 @@
+services:
+  frigate:
+    cpuset: "0-9"    # keep off cores 10-15, reserved for game servers
+    container_name: frigate
+    image: ghcr.io/blakeblackshear/frigate:stable-tensorrt
+    restart: unless-stopped
+    shm_size: "512mb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./config:/config
+      - /mnt/media/frigate:/media/frigate
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5000:5000"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+      - "1984:1984"
+    environment:
+      - FRIGATE_RTSP_PASSWORD=${FRIGATE_RTSP_PASSWORD}
+      - FRIGATE_CAMERA_USER=${FRIGATE_CAMERA_USER}
+      - FRIGATE_CAMERA_PASSWORD=${FRIGATE_CAMERA_PASSWORD}
+      - FRIGATE_MQTT_PASSWORD=${FRIGATE_MQTT_PASSWORD}

@@ -1,0 +1,8 @@
+[Unit]
+Description=Update the Factorio server to the current stable headless release
+After=docker.service wings.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/factorio-autoupdate
