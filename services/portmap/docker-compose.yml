@@ -1,0 +1,9 @@
+services:
+  portmap:
+    image: nginx:alpine
+    container_name: portmap
+    restart: unless-stopped
+    ports:
+      - "1337:80"
+    volumes:
+      - ./html:/usr/share/nginx/html:ro

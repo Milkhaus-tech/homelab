@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelab Hardware Guide</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--fg:#e6edf3;--dim:#8b949e;
+        --noahlab:#58a6ff;--jesus:#3fb950;--pablo:#d29922;--vultr:#f85149;--desktop:#bc8cff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:24px;max-width:1000px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:var(--dim);margin-bottom:18px;font-size:13px}
+  section{margin-bottom:26px}
+  h2{font-size:16px;padding:6px 10px;border-left:4px solid var(--accent,#888);
+     background:var(--panel);border-radius:0 6px 6px 0;margin-bottom:8px}
+  h2 small{color:var(--dim);font-weight:normal;margin-left:8px;font-size:12px}
+  h3{font-size:14px;margin:14px 0 6px;color:var(--fg)}
+  p,li{font-size:13.5px;margin-bottom:6px}
+  ul,ol{margin:0 0 10px 22px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:10px}
+  th{color:var(--dim);text-align:left;font-weight:600;padding:4px 8px;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:5px 8px;border-bottom:1px solid #21262d;vertical-align:top}
+  tr:hover td{background:#1c2129}
+  a{color:var(--noahlab);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .ok{color:var(--jesus);font-weight:600}
+  .todo{color:var(--pablo);font-weight:600}
+  .warn{color:var(--vultr)}
+  .note{color:var(--dim);font-size:12.5px}
+  pre{background:var(--panel);border:1px solid var(--border);border-radius:8px;
+      padding:10px 14px;font-size:12.5px;overflow-x:auto;margin:6px 0 12px}
+  kbd{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:0 5px;font-size:12px}
+  .tag{display:inline-block;padding:0 7px;border-radius:10px;font-size:11px;border:1px solid var(--border);color:var(--dim);margin-left:6px;white-space:nowrap}
+  footer{color:var(--dim);font-size:12px;margin-top:30px;border-top:1px solid var(--border);padding-top:10px}
+</style>
+</head>
+<body>
+<h1>🔧 Homelab Hardware Guide</h1>
+<div class="sub">Wake-on-LAN, BIOS settings, and desktop virtualization — everything that needs a reboot or physical access, per machine. Facts verified live 2026-08-16. &larr; <a href="index.html">back to port map</a></div>
+
+<section>
+<h2>📋 Status at a glance</h2>
+<table>
+<tr><th>machine</th><th>board</th><th>NIC / MAC</th><th>WoL hardware</th><th>WoL OS side</th><th>WoL BIOS side</th></tr>
+<tr><td>noahlab</td><td>Gigabyte B450M DS3H</td><td>enp5s0 · b4:2e:99:ed:09:b2</td><td class="ok">supported (g)</td><td class="todo">step 1</td><td class="todo">step 2</td></tr>
+<tr><td>jesus</td><td>MSI PRO B550M-VC WIFI</td><td>enp42s0 · d8:43:ae:4c:38:65</td><td class="ok">supported (g)</td><td class="todo">step 1</td><td class="todo">step 2</td></tr>
+<tr><td>pablo</td><td>Biostar B450MH</td><td>enp4s0 · f4:b5:20:2d:df:2b</td><td class="ok">supported (g)</td><td class="todo">step 1</td><td class="todo">step 2</td></tr>
+<tr><td>noah-desktop</td><td>Gigabyte B550 EAGLE WIFI6 (BIOS F1)</td><td>enp5s0 · 10:ff:e0:c4:88:fb (r8169)</td><td class="ok">[likely] supported</td><td class="todo">step 1</td><td class="todo">step 2</td></tr>
+</table>
+<p class="note">"Supported (g)" = verified with <kbd>ethtool</kbd> (magic packet in <kbd>Supports Wake-on: pumbg</kbd>). All four currently report <kbd>Wake-on: d</kbd> (disabled) at the OS level. Desktop NIC not yet verified (needs sudo) but the r8169/Realtek on this board supports it — step 1 will confirm.</p>
+<p>A <kbd>wake</kbd> command is installed at <kbd>~/bin/wake</kbd> on the desktop and noahlab (no packages needed): <kbd>wake jesus</kbd>, <kbd>wake pablo</kbd>, <kbd>wake noahlab</kbd>, <kbd>wake desktop</kbd>. To wake the desktop itself, run it from noahlab.</p>
+</section>
+
+<section style="--accent:var(--jesus)">
+<h2>1️⃣ Step 1 — enable WoL in the OS <small>copy-paste, no reboot needed</small></h2>
+<p>Turns the NIC's magic-packet listener on now, and installs a tiny systemd unit so it survives reboots (drivers reset it to <kbd>d</kbd> on every boot otherwise).</p>
+
+<h3>noahlab / jesus / pablo — run the block on each (adjust IFACE)</h3>
+<pre># IFACE per node: noahlab=enp5s0  jesus=enp42s0  pablo=enp4s0
+IFACE=enp5s0
+sudo ethtool -s $IFACE wol g
+sudo tee /etc/systemd/system/wol.service &lt;&lt;EOF
+[Unit]
+Description=Enable Wake-on-LAN on $IFACE
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/ethtool -s $IFACE wol g
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload &amp;&amp; sudo systemctl enable wol.service
+sudo ethtool $IFACE | grep Wake-on   # want: Wake-on: g</pre>
+
+<h3>noah-desktop — netplan manages the NIC here, so persist it there instead</h3>
+<pre>sudo ethtool -s enp5s0 wol g                       # immediate
+sudo ethtool enp5s0 | grep Wake-on                 # confirm "Supports Wake-on" includes g
+# persist: add "wakeonlan: true" under the enp5s0 ethernet in the netplan yaml
+ls /etc/netplan/                                   # find the yaml
+#   ethernets:
+#     enp5s0:
+#       wakeonlan: true        &lt;-- add this line
+sudo netplan apply</pre>
+</section>
+
+<section style="--accent:var(--pablo)">
+<h2>2️⃣ Step 2 — BIOS settings per machine <small>needs a reboot + keyboard/monitor (or the crash cart)</small></h2>
+<p>Two settings matter everywhere: <b>enable PCI-E/PME wake</b> (lets the NIC power the machine on) and <b>disable ErP/EuP deep-sleep</b> (ErP cuts power to the NIC when off, which kills WoL). Third, for the three servers only: <b>restore power after AC loss</b> — after a power cut they come back on their own instead of staying dark until you notice. That one is a bigger real-world uptime win than WoL itself.</p>
+
+<h3>noahlab — Gigabyte B450M DS3H <span class="tag">Del at boot</span></h3>
+<ul>
+<li><kbd>Settings → Platform Power</kbd> (may be under M.I.T. on older F-revisions): <b>ErP = Disabled</b>, <b>Wake on LAN = Enabled</b></li>
+<li><kbd>Settings → Platform Power → AC BACK</kbd> = <b>Always On</b> (power-loss auto-restart)</li>
+</ul>
+
+<h3>jesus — MSI PRO B550M-VC WIFI <span class="tag">Del at boot</span></h3>
+<ul>
+<li><kbd>Settings → Advanced → Wake Up Event Setup</kbd>: <b>Resume By PCI-E Device = Enabled</b> (this is MSI's WoL switch)</li>
+<li><kbd>Settings → Advanced → Power Management Setup</kbd>: <b>ErP Ready = Disabled</b>, <b>Restore after AC Power Loss = Power On</b></li>
+</ul>
+
+<h3>pablo — Biostar B450MH <span class="tag">Del at boot · menu names vary on Biostar</span></h3>
+<ul>
+<li><kbd>Advanced → ACPI Settings</kbd> (or Wake Up Configuration): <b>Wake on PME / PCIE Wake = Enabled</b></li>
+<li>ErP/EuP option (often under Advanced or Power): <b>Disabled</b></li>
+<li><kbd>State After Power Failure / Restore AC Power Loss</kbd> = <b>Power On</b></li>
+</ul>
+
+<h3>noah-desktop — Gigabyte B550 EAGLE WIFI6 <span class="tag">Del at boot</span></h3>
+<ul>
+<li><kbd>Settings → Platform Power</kbd>: <b>ErP = Disabled</b>, <b>Wake on LAN = Enabled</b></li>
+<li>Leave AC BACK alone (you don't want the desktop booting itself after outages)</li>
+<li class="note">BIOS is <b>F1 — launch firmware</b>. Optional: update via Q-Flash (BIOS → F8) for AGESA/memory/fTPM fixes. Not required — virtualization is already confirmed working — so only bother if you hit instability. Don't power-cycle mid-flash.</li>
+</ul>
+
+<h3>Testing (do suspend first, then full poweroff)</h3>
+<pre># from the desktop (or noahlab, for waking the desktop):
+ssh jesus 'sudo systemctl suspend'   # test 1: suspend
+wake jesus                            # should come back in ~5s
+ssh jesus 'sudo poweroff'             # test 2: full shutdown (needs the BIOS bits)
+wake jesus                            # should cold-boot</pre>
+
+<h3 class="warn">⚠ The desktop's WiFi-bridge caveat</h3>
+<p>The desktop's ethernet runs through the TP-Link extender in client-bridge mode. Magic packets are plain broadcast UDP frames and bridges normally forward broadcasts, so this <i>usually</i> works — but two conditions must hold: <b>the extender stays powered</b> (the sleeping NIC keeps its link to the extender, not the router), and the extender forwards broadcast traffic toward its wired client (most TP-Links do; a few do aggressive MAC-translation filtering). The suspend test above is the definitive answer — if <kbd>wake desktop</kbd> from noahlab works through the bridge once, it'll keep working. If it doesn't, waking the desktop remotely isn't possible over that link; everything else (the three nodes on real ethernet) is unaffected.</p>
+</section>
+
+<section style="--accent:var(--desktop)">
+<h2>📱 Android games on noah-desktop <small>Waydroid — verified ready</small></h2>
+<table>
+<tr><th>requirement</th><th>status</th></tr>
+<tr><td>CPU virtualization (AMD-V/SVM in BIOS)</td><td class="ok">enabled — kvm_amd loaded, /dev/kvm present</td></tr>
+<tr><td>KVM stack</td><td class="ok">libvirtd active, virsh installed (leftover-ready from the reinstall)</td></tr>
+<tr><td>Wayland session (Waydroid requirement)</td><td class="ok">current session is Wayland</td></tr>
+<tr><td>binder kernel module (Waydroid requirement)</td><td class="ok">binder_linux present in kernel 7.0.0-28</td></tr>
+<tr><td>GPU</td><td class="ok">RX 9060 XT on mesa — good Waydroid support</td></tr>
+</table>
+<p>So yes — the box is ready, no BIOS changes needed for this. For Play Store games specifically, <b>Waydroid</b> (an Android container, near-native speed) beats the Android Studio emulator. Install:</p>
+<pre>curl -s https://repo.waydro.id | sudo bash
+sudo apt install waydroid
+sudo waydroid init -s GAPPS          # GAPPS = with Play Store
+waydroid session start &amp;
+waydroid show-full-ui</pre>
+<p><b>Play certification</b> (Play Store shows "device not certified" until you do this):</p>
+<pre>sudo waydroid shell -- sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \
+  "select value from main where name = 'android_id';"
+# paste that number at https://www.google.com/android/uncertified — takes ~20 min to clear</pre>
+<p><b>ARM-only games:</b> many Play games ship ARM-only builds. Install a translation layer with <a href="https://github.com/casualsnek/waydroid_script">waydroid_script</a> — pick <b>libndk</b> (better on AMD CPUs than libhoudini). The same script can install Magisk if a game demands it.</p>
+<p class="note">Straight talk: games enforcing Play Integrity / hardware attestation (some gacha titles, most banking-grade apps) will detect the container and refuse regardless of setup. Most games work; those won't. Fallback for a stubborn title: Android Studio's emulator with a Play Store x86_64 image — slower, but a different detection profile. KVM is already set up for it.</p>
+</section>
+
+<footer>Maintained by Claude · verified against live hardware 2026-08-16 · companion to the <a href="index.html">port map</a></footer>
+</body>
+</html>
