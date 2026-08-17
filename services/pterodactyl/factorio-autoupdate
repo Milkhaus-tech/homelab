@@ -3,7 +3,7 @@
 # an unjoinable one. Track the current stable headless release.
 set -uo pipefail
 
-UUID=c6e63d7d-0d5e-4a85-862a-ce956c6dc2b7
+UUID=224908c7-1565-4a0c-8249-d4fc2b834f86
 VOL=/var/lib/pterodactyl/volumes/$UUID
 BASE=http://127.0.0.1:8090/api/servers/$UUID
 STOP_WAIT=180
@@ -22,6 +22,14 @@ post() { curl -sS -m 30 -o /dev/null -X POST "$BASE/$1" \
          -H "Authorization: Bearer $token" -H 'Content-Type: application/json' -d "$2"; }
 state() { curl -sS -m 15 "$BASE" -H "Authorization: Bearer $token" 2>/dev/null | jq -r '.state // empty'; }
 version_now() { jq -r '.version // empty' "$VOL/data/base/info.json" 2>/dev/null; }
+
+# A suspended or deliberately stopped server serves nobody, and updating it would
+# also mean starting it -- leave those alone rather than resurrecting them.
+info=$(curl -sS -m 15 "$BASE" -H "Authorization: Bearer $token")
+st=$(echo "$info" | jq -r '.state // empty')
+[ -n "$st" ] || alert "could not read server state from wings"
+[ "$(echo "$info" | jq -r '.is_suspended // false')" = true ] && { log "server suspended, skipping"; exit 0; }
+[ "$st" = offline ] && { log "server is stopped, leaving it stopped"; exit 0; }
 
 installed=$(version_now)
 [ -n "$installed" ] || alert "cannot read installed version from data/base/info.json"
