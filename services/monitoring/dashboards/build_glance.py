@@ -72,6 +72,8 @@ def banner(y=0, h=4):
 
 NL = 'instance="192.168.1.10:9100"'
 ND = 'instance="192.168.1.13:9100"'
+NJ = 'instance="192.168.1.11:9100"'  # Jesus — miner, back online
+NP = 'instance="192.168.1.12:9100"'  # Pablo — miner, back online
 
 # tile label -> promql selector inside container_last_seen{...}
 # game servers matched by wings label + image so tiles survive delete/recreate (new UUID)
@@ -101,10 +103,12 @@ container_targets = [{
 panels = [
     banner(y=0, h=4),
 
-    bigstat("Noahlab (server)", f'up{{{NL}}}', ONOFF, 0, 4),
-    bigstat("Noah Desktop", f'up{{{ND}}}', ONOFF, 6, 4),
-    countstat("Problems (targets down)", "count(up == 0) or vector(0)", "12", 4, problems),
-    countstat("Containers running", 'count(container_last_seen{name!=""})', "18", 4, plain, fixed=TETO),
+    bigstat("Noahlab (server)", f'up{{{NL}}}', ONOFF, 0, 4, w=4),
+    bigstat("Noah Desktop", f'up{{{ND}}}', ONOFF, 4, 4, w=4),
+    bigstat("Jesus (miner)", f'up{{{NJ}}}', ONOFF, 8, 4, w=4),
+    bigstat("Pablo (miner)", f'up{{{NP}}}', ONOFF, 12, 4, w=4),
+    countstat("Problems (targets down)", "count(up == 0) or vector(0)", "16", 4, problems, w=4),
+    countstat("Containers running", 'count(container_last_seen{name!=""})', "20", 4, plain, w=4, fixed=TETO),
 
     usage("Noahlab CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{NL}}}[5m])) * 100)', "percent", 0, 9, pct, h=4),
     usage("Noahlab RAM", f'(1 - node_memory_MemAvailable_bytes{{{NL}}} / node_memory_MemTotal_bytes{{{NL}}}) * 100', "percent", 4, 9, pct, h=4),
@@ -113,22 +117,30 @@ panels = [
     usage("Desktop CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{ND}}}[5m])) * 100)', "percent", 16, 9, pct, h=4),
     usage("Desktop RAM", f'(1 - node_memory_MemAvailable_bytes{{{ND}}} / node_memory_MemTotal_bytes{{{ND}}}) * 100', "percent", 20, 9, pct, h=4),
 
+    # Miner row — temp gets its own tile: heat is why these two get powered off
+    usage("Jesus CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{NJ}}}[5m])) * 100)', "percent", 0, 13, pct, h=4),
+    usage("Jesus RAM", f'(1 - node_memory_MemAvailable_bytes{{{NJ}}} / node_memory_MemTotal_bytes{{{NJ}}}) * 100', "percent", 4, 13, pct, h=4),
+    usage("Jesus temp", f'max(node_hwmon_temp_celsius{{{NJ}}})', "celsius", 8, 13, tempth, h=4),
+    usage("Pablo CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{NP}}}[5m])) * 100)', "percent", 12, 13, pct, h=4),
+    usage("Pablo RAM", f'(1 - node_memory_MemAvailable_bytes{{{NP}}} / node_memory_MemTotal_bytes{{{NP}}}) * 100', "percent", 16, 13, pct, h=4),
+    usage("Pablo temp", f'max(node_hwmon_temp_celsius{{{NP}}})', "celsius", 20, 13, tempth, h=4),
+
     # Home Assistant row
     usage("House temp", 'homeassistant_climate_current_temperature_celsius', "celsius",
-          0, 13, [{"color": "green", "value": None}, {"color": "yellow", "value": 27}, {"color": "red", "value": 30}], h=4),
+          0, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 27}, {"color": "red", "value": 30}], h=4),
     usage("House humidity", 'homeassistant_sensor_humidity_percent', "percent",
-          4, 13, [{"color": "green", "value": None}, {"color": "yellow", "value": 60}, {"color": "red", "value": 70}], h=4),
+          4, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 60}, {"color": "red", "value": 70}], h=4),
     usage("Lights on", 'count(homeassistant_light_brightness_percent > 0) or vector(0)', "none",
-          8, 13, plain, h=4, fixed=TETO),
+          8, 17, plain, h=4, fixed=TETO),
     usage("Low batteries (<30%)", 'count(homeassistant_sensor_battery_percent < 30) or vector(0)', "none",
-          12, 13, [{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}], h=4),
+          12, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}], h=4),
     usage("HA entities unavailable", 'count(homeassistant_entity_available == 0) or vector(0)', "none",
-          16, 13, plain, h=4, fixed=TETO),
+          16, 17, plain, h=4, fixed=TETO),
     usage("Automations fired (24h)", 'sum(increase(homeassistant_automation_triggered_count_total[24h])) or vector(0)', "none",
-          20, 13, plain, h=4, fixed=TETO),
+          20, 17, plain, h=4, fixed=TETO),
 
     {"id": nid(), "type": "stat", "title": "Important containers",
-     "gridPos": {"x": 0, "y": 17, "w": 24, "h": 8}, "datasource": DS,
+     "gridPos": {"x": 0, "y": 21, "w": 24, "h": 8}, "datasource": DS,
      "targets": container_targets,
      "fieldConfig": {"defaults": {"mappings": UPDOWN,
          "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": None}]}},

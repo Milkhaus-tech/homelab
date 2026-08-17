@@ -22,11 +22,18 @@ def stat(title, expr, unit, x, y, w=4, h=4, thresholds=None, decimals=1):
     }
 
 TETO = "#C63C51"
-DESKTOP_BLUE = "#3F8FD2"  # pair validated with TETO for CVD/contrast (dataviz checks)
+DESKTOP_BLUE = "#3F8FD2"
+JESUS_AMBER = "#B27C1C"
+PABLO_TEAL = "#2F9A80"
 
 def color_override(name, color):
     return {"matcher": {"id": "byName", "options": name},
             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": color}}]}
+
+# Fixed host->hue map; validated for CVD separation + surface contrast (dataviz checks)
+HOST_COLORS = (("192.168.1.10:9100", TETO), ("192.168.1.13:9100", DESKTOP_BLUE),
+               ("192.168.1.11:9100", JESUS_AMBER), ("192.168.1.12:9100", PABLO_TEAL))
+host_overrides = lambda: [color_override(i, c) for i, c in HOST_COLORS]
 
 def ts(title, targets, unit, x, y, w=12, h=8, extra_defaults=None, overrides=None,
        desc=None, fixed=None, legend_table=True):
@@ -73,13 +80,13 @@ panels = [
         "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background",
                     "textMode": "value_and_name", "graphMode": "none"},
     },
-    # Row C — host trends (Noahlab crimson / Desktop blue, pair validated for CVD+contrast)
+    # Row C — host trends, one fixed hue per host (see HOST_COLORS)
     ts("CPU per host", [target('100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)', "{{instance}}")],
        "percent", 0, 9, extra_defaults={"min": 0, "max": 100},
-       overrides=[color_override("192.168.1.10:9100", TETO), color_override("192.168.1.13:9100", DESKTOP_BLUE)]),
+       overrides=host_overrides()),
     ts("Memory used per host", [target('(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100', "{{instance}}")],
        "percent", 12, 9, extra_defaults={"min": 0, "max": 100},
-       overrides=[color_override("192.168.1.10:9100", TETO), color_override("192.168.1.13:9100", DESKTOP_BLUE)]),
+       overrides=host_overrides()),
     # Row D — network + disk
     ts("Network throughput (Noahlab)", [
         target('sum(rate(node_network_receive_bytes_total{instance="192.168.1.10:9100",device!~"lo|veth.*|br-.*|docker.*"}[5m])) * 8', "receive"),
@@ -90,19 +97,23 @@ panels = [
                    "properties": [{"id": "custom.transform", "value": "negative-Y"}]}]),
     ts("Filesystem used %", [target('100 - (node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"} * 100)', "{{instance}} {{mountpoint}}")],
        "percent", 12, 17, extra_defaults={"min": 0, "max": 100}),
-    # Row E — containers (many series: default palette, list legend to keep height sane)
+    # Row E — temps: heat is what governs the two miners' duty cycle
+    ts("Temperature per host", [target('max by(instance) (node_hwmon_temp_celsius)', "{{instance}}")],
+       "celsius", 0, 25, w=24, overrides=host_overrides(),
+       desc="Hottest hwmon sensor per host. Jesus and Pablo get powered off when summer heat makes them impractical."),
+    # Row F — containers (many series: default palette, list legend to keep height sane)
     ts("Top 10 containers by CPU", [target('topk(10, sum by(name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) * 100)', "{{name}}")],
-       "percent", 0, 25, extra_defaults={"min": 0}, legend_table=False),
+       "percent", 0, 33, extra_defaults={"min": 0}, legend_table=False),
     ts("Top 10 containers by memory", [target('topk(10, sum by(name) (container_memory_working_set_bytes{name!=""}))', "{{name}}")],
-       "bytes", 12, 25, legend_table=False),
-    # Row F — services
+       "bytes", 12, 33, legend_table=False),
+    # Row G — services
     ts("Jellyfin HTTP requests/s", [target('sum(rate(http_requests_received_total{job="jellyfin"}[5m]))', "req/s")],
-       "reqps", 0, 33, w=8, fixed=TETO, extra_defaults={"min": 0},
+       "reqps", 0, 41, w=8, fixed=TETO, extra_defaults={"min": 0},
        desc="Jellyfin exposes only generic .NET runtime metrics natively — request rate is the best health proxy."),
     ts("Frigate camera FPS", [target('frigate_camera_fps', "{{camera_name}}{{camera}}")],
-       "none", 8, 33, w=8, legend_table=False),
+       "none", 8, 41, w=8, legend_table=False),
     ts("Frigate detector inference", [target('frigate_detector_inference_speed_seconds * 1000', "{{name}}")],
-       "ms", 16, 33, w=8, fixed=TETO, extra_defaults={"min": 0}),
+       "ms", 16, 41, w=8, fixed=TETO, extra_defaults={"min": 0}),
 ]
 
 dash = {

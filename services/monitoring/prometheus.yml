@@ -6,9 +6,8 @@ scrape_configs:
     static_configs:
       - targets:
           - '192.168.1.10:9100'  # Noahlab
-          # Miners powered off for summer heat — uncomment when they return:
-          # - '192.168.1.11:9100'  # Jesus
-          # - '192.168.1.12:9100'  # Pablo
+          - '192.168.1.11:9100'  # Jesus
+          - '192.168.1.12:9100'  # Pablo
           - '192.168.1.13:9100'  # Noah Desktop
 
   - job_name: 'cadvisor'

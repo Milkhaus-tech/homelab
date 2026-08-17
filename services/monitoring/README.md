@@ -8,7 +8,7 @@ re-running two scripts.
 
 | Job | Targets | Notes |
 |---|---|---|
-| `node_stats` | this box + a desktop (node_exporter) | two more fleet machines commented out for the summer — they return in winter |
+| `node_stats` | this box, a desktop, and two miners (node_exporter) | the miners are powered down in summer heat, so their tiles read OFFLINE and count toward "problems" while they're off |
 | `cadvisor` | per-container CPU/memory/network | on 8098; 8080 is taken by qBittorrent |
 | `exportarr` ×3 | Sonarr / Radarr / Prowlarr | queue depth, library counts, indexer health |
 | `jellyfin` | native `/metrics` | generic .NET runtime metrics only — request rate is the honest health proxy |
@@ -26,14 +26,14 @@ python3 dashboards/build_glance.py | curl -sS -X POST -H 'Content-Type: applicat
   -u "$GRAFANA_USER:$GRAFANA_PASS" -d @- http://localhost:3000/api/dashboards/db
 ```
 
-- **At a Glance** (`homelab-glance`): host tiles, usage row, a Home Assistant row
+- **At a Glance** (`homelab-glance`): four host tiles, two usage rows, a Home Assistant row
   (house temp/humidity/lights/batteries), and a 20-container UP/DOWN grid. Game-server
   tiles match on the Wings container *label + image* rather than name, so they survive
   a server being deleted and recreated under a new UUID.
 - **Homelab Overview** (`homelab-overview`): trends — per-host CPU/RAM, network with
   transmit drawn below the axis, filesystem fill, top-10 containers, and service
-  panels (Jellyfin req/s, Frigate FPS + inference). The two host colors are a
-  CVD-validated pair.
+  panels (Jellyfin req/s, Frigate FPS + inference). The four host colors are a
+  CVD-validated set (adjacent-pair separation + surface contrast, both themes).
 
 Both dashboards cross-link, with imported per-app dashboards tucked behind a tagged
 dropdown.
