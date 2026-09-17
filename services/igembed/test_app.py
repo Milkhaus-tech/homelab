@@ -1,7 +1,9 @@
 import asyncio
+from io import BytesIO
 
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
+from PIL import Image
 
 from app import create_app
 
@@ -33,6 +35,26 @@ RESULT = {
     "like_count": 27781,
     "comment_count": 512,
 }
+
+PHOTO_RESULT = {
+    "video_url": None,
+    "thumbnail_url": "https://cdn.invalid/photo.jpg",
+    "images": ["https://cdn.invalid/photo.jpg"],
+    "width": None,
+    "height": None,
+    "description": "photo caption",
+    "channel": "photographer",
+    "uploader_id": None,
+    "uploader": None,
+    "like_count": 12,
+    "comment_count": 3,
+}
+
+
+def jpeg(size, color):
+    output = BytesIO()
+    Image.new("RGB", size, color).save(output, "JPEG")
+    return output.getvalue()
 
 
 async def run_tests():
@@ -73,6 +95,20 @@ async def run_tests():
         assert response.status == 200
         assert "couldn&#x27;t fetch this post" in await response.text()
 
+    async with TestClient(TestServer(create_app(FakeExtractor(PHOTO_RESULT), BASE))) as client:
+        response = await client.get(f"/p/{ID}/", headers={"User-Agent": "Discordbot/2.0"})
+        body = await response.text()
+        assert response.status == 200
+        assert f'<meta property="og:image" content="{BASE}/image/{ID}">' in body
+        assert '<meta name="twitter:card" content="summary_large_image">' in body
+        assert 'property="og:type" content="website"' in body
+        assert "og:video" not in body
+        response = await client.get(
+            f"/p/{ID}/", headers={"Range": "bytes=0-100"}, allow_redirects=False,
+        )
+        assert response.status == 302
+        assert response.headers["Location"] == f"/image/{ID}"
+
     seen = {}
 
     async def cdn(request):
@@ -106,6 +142,66 @@ async def run_tests():
             assert seen["range"] == "bytes=0-100"
     finally:
         await cdn_server.close()
+
+    image_hits = []
+    image_data = [
+        jpeg((20, 10), "red"), jpeg((10, 20), "green"), jpeg((30, 30), "blue"),
+    ]
+
+    async def image_cdn(request):
+        index = int(request.match_info["index"])
+        image_hits.append(index)
+        return web.Response(body=image_data[index], content_type="image/jpeg")
+
+    image_app = web.Application()
+    image_app.router.add_get("/{index}.jpg", image_cdn)
+    image_server = TestServer(image_app)
+    await image_server.start_server()
+    try:
+        urls = [str(image_server.make_url(f"/{index}.jpg")) for index in range(3)]
+        grid_result = dict(PHOTO_RESULT, thumbnail_url=urls[0], images=urls)
+        async with TestClient(TestServer(create_app(FakeExtractor(grid_result), BASE))) as client:
+            response = await client.get(f"/image/{ID}")
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "image/jpeg"
+            with Image.open(BytesIO(await response.read())) as grid:
+                assert grid.size == (2048, 2048)
+            assert sorted(image_hits) == [0, 1, 2]
+            response = await client.get(f"/image/{ID}")
+            assert response.status == 200
+            assert sorted(image_hits) == [0, 1, 2]
+            response = await client.get(f"/p/{ID}/", headers={"User-Agent": "Discordbot"})
+            body = await response.text()
+            assert "photo caption (3 photos)" in body
+            assert '<meta property="og:image:width" content="2048">' in body
+            assert '<meta property="og:image:height" content="2048">' in body
+    finally:
+        await image_server.close()
+
+    fallback_hits = []
+
+    async def failing_cdn(request):
+        index = int(request.match_info["index"])
+        fallback_hits.append(index)
+        if index == 1:
+            return web.Response(status=500)
+        return web.Response(body=image_data[index], content_type="image/jpeg")
+
+    fallback_app = web.Application()
+    fallback_app.router.add_get("/{index}.jpg", failing_cdn)
+    fallback_server = TestServer(fallback_app)
+    await fallback_server.start_server()
+    try:
+        urls = [str(fallback_server.make_url(f"/{index}.jpg")) for index in range(3)]
+        fallback_result = dict(PHOTO_RESULT, thumbnail_url=urls[0], images=urls)
+        async with TestClient(TestServer(create_app(FakeExtractor(fallback_result), BASE))) as client:
+            response = await client.get(f"/image/{ID}")
+            assert response.status == 200
+            assert response.headers["Content-Type"] == "image/jpeg"
+            assert await response.read() == image_data[0]
+            assert fallback_hits.count(0) == 2
+    finally:
+        await fallback_server.close()
 
 
 if __name__ == "__main__":

@@ -4,12 +4,14 @@ import logging
 import os
 import re
 import time
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlencode
 
 import aiohttp
 from aiohttp import web
 import yt_dlp
+from PIL import Image
 
 
 LOG = logging.getLogger("igembed")
@@ -41,6 +43,7 @@ class Extractor:
             "skip_download": True,
             "noplaylist": False,
             "format": "best[acodec!=none][vcodec!=none]/best",
+            "ignore_no_formats_error": True,
         }
         if self.cookies_file:
             options["cookiefile"] = self.cookies_file
@@ -49,7 +52,26 @@ class Extractor:
         item = _first_media(info)
         if item and item.get("url"):
             return _result_from_info(item)
-        raise RuntimeError("no progressive media format found")
+        entries = (info.get("entries") or ()) if info.get("_type") == "playlist" else (info,)
+        images = [entry.get("thumbnail") for entry in entries if entry and entry.get("thumbnail")]
+        if not images:
+            raise RuntimeError("no media found")
+        fallback = next((entry for entry in entries if entry), {})
+        metadata = {
+            key: info.get(key) if info.get(key) is not None else fallback.get(key)
+            for key in (
+                "title", "uploader", "channel", "uploader_id", "description",
+                "like_count", "comment_count",
+            )
+        }
+        return {
+            "video_url": None,
+            "thumbnail_url": images[0],
+            "images": images,
+            "width": None,
+            "height": None,
+            **metadata,
+        }
 
 
 def _first_media(info):
@@ -57,7 +79,7 @@ def _first_media(info):
         return None
     if info.get("_type") == "playlist":
         for entry in info.get("entries") or ():
-            if entry and entry.get("formats"):
+            if entry and entry.get("url"):
                 return entry
         return None
     return info
@@ -176,33 +198,45 @@ def render_og(shortcode, result, base_url):
     if result.get("comment_count") is not None:
         counts.append(f"💬 {result['comment_count']:,}")
     oembed_query = urlencode({"text": "  ".join(counts), "url": instagram_url})
+    is_video = bool(result.get("video_url"))
+    if not is_video and len(result.get("images") or ()) > 1:
+        description += f" ({len(result['images'])} photos)"
     tags = [
         '<!DOCTYPE html><html><head><meta charset="utf-8">',
         '<meta name="theme-color" content="#E1306C">',
         '<meta property="og:site_name" content="ig.milkhaus.net">',
-        '<meta property="og:type" content="video.other">',
+        f'<meta property="og:type" content="{"video.other" if is_video else "website"}">',
         f'<meta property="og:url" content="{_escape(instagram_url)}">',
         f'<meta property="og:title" content="{_escape(username)}">',
         f'<meta property="og:description" content="{_escape(description)}">',
         f'<meta property="og:image" content="{_escape(image_url)}">',
-        f'<meta property="og:video" content="{_escape(video_url)}">',
-        f'<meta property="og:video:secure_url" content="{_escape(video_url)}">',
-        '<meta property="og:video:type" content="video/mp4">',
     ]
-    if result.get("width") is not None:
-        tags.append(f'<meta property="og:video:width" content="{_escape(result["width"])}">')
-    if result.get("height") is not None:
-        tags.append(f'<meta property="og:video:height" content="{_escape(result["height"])}">')
-    tags.extend([
-        '<meta name="twitter:card" content="player">',
-        f'<meta name="twitter:title" content="{_escape(username)}">',
-        f'<meta name="twitter:player:stream" content="{_escape(video_url)}">',
-        '<meta name="twitter:player:stream:content_type" content="video/mp4">',
-    ])
-    if result.get("width") is not None:
-        tags.append(f'<meta name="twitter:player:width" content="{_escape(result["width"])}">')
-    if result.get("height") is not None:
-        tags.append(f'<meta name="twitter:player:height" content="{_escape(result["height"])}">')
+    if is_video:
+        tags.extend([
+            f'<meta property="og:video" content="{_escape(video_url)}">',
+            f'<meta property="og:video:secure_url" content="{_escape(video_url)}">',
+            '<meta property="og:video:type" content="video/mp4">',
+        ])
+        if result.get("width") is not None:
+            tags.append(f'<meta property="og:video:width" content="{_escape(result["width"])}">')
+        if result.get("height") is not None:
+            tags.append(f'<meta property="og:video:height" content="{_escape(result["height"])}">')
+        tags.extend([
+            '<meta name="twitter:card" content="player">',
+            f'<meta name="twitter:title" content="{_escape(username)}">',
+            f'<meta name="twitter:player:stream" content="{_escape(video_url)}">',
+            '<meta name="twitter:player:stream:content_type" content="video/mp4">',
+        ])
+        if result.get("width") is not None:
+            tags.append(f'<meta name="twitter:player:width" content="{_escape(result["width"])}">')
+        if result.get("height") is not None:
+            tags.append(f'<meta name="twitter:player:height" content="{_escape(result["height"])}">')
+    else:
+        tags.append('<meta name="twitter:card" content="summary_large_image">')
+        if result.get("width") is not None:
+            tags.append(f'<meta property="og:image:width" content="{_escape(result["width"])}">')
+        if result.get("height") is not None:
+            tags.append(f'<meta property="og:image:height" content="{_escape(result["height"])}">')
     tags.extend([
         f'<link rel="alternate" href="{_escape(base_url)}/oembed?{_escape(oembed_query)}" '
         f'type="application/json+oembed" title="{_escape(username)}">',
@@ -225,7 +259,9 @@ async def post_route(request):
     classification = "media" if media else "bot" if bot else "human"
     LOG.info("post id=%s class=%s ua=%r", shortcode, classification, ua)
     if media:
-        raise web.HTTPFound(f"/video/{shortcode}")
+        result = await request.app["extractions"].get(shortcode)
+        kind = "image" if result and not result.get("video_url") else "video"
+        raise web.HTTPFound(f"/{kind}/{shortcode}")
     if bot:
         result = await request.app["extractions"].get(shortcode)
         page = render_og(shortcode, result, request.app["base_url"])
@@ -276,7 +312,68 @@ async def video_route(request):
 
 
 async def image_route(request):
-    return await proxy(request, "thumbnail")
+    shortcode = request.match_info["shortcode"]
+    result = await request.app["extractions"].get(shortcode)
+    images = result and result.get("images")
+    if not images or len(images) == 1:
+        return await proxy(request, "thumbnail")
+    lock = request.app["grid_locks"].setdefault(shortcode, asyncio.Lock())
+    try:
+        async with lock:
+            if result.get("grid") is None:
+                blobs = await asyncio.gather(*[
+                    _fetch_image(request.app["client_session"], url) for url in images[:4]
+                ])
+                grid, width, height = await asyncio.to_thread(_make_grid, blobs)
+                result["grid"] = grid
+                result["width"], result["height"] = width, height
+        request.app["grid_locks"].pop(shortcode, None)
+        body = result["grid"]
+        return web.Response(
+            body=b"" if request.method == "HEAD" else body,
+            headers={
+                "Content-Type": "image/jpeg",
+                "Content-Length": str(len(body)),
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+    except Exception as exc:
+        LOG.warning("grid id=%s error=%s; falling back", shortcode, exc)
+        return await proxy(request, "thumbnail")
+
+
+async def _fetch_image(session, url):
+    timeout = aiohttp.ClientTimeout(total=10)
+    async with session.get(url, timeout=timeout) as response:
+        if response.status != 200:
+            raise RuntimeError(f"image upstream status {response.status}")
+        length = response.content_length
+        if length is not None and length > 10 * 1024 * 1024:
+            raise RuntimeError("image exceeds 10 MB")
+        data = bytearray()
+        async for chunk in response.content.iter_chunked(64 * 1024):
+            data.extend(chunk)
+            if len(data) > 10 * 1024 * 1024:
+                raise RuntimeError("image exceeds 10 MB")
+        return bytes(data)
+
+
+def _make_grid(blobs):
+    images = []
+    for blob in blobs:
+        with Image.open(BytesIO(blob)) as source:
+            image = source.convert("RGB")
+            image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+            images.append(image.copy())
+    rows = 1 if len(images) == 2 else 2
+    canvas = Image.new("RGB", (2048, rows * 1024), "white")
+    for index, image in enumerate(images):
+        x = (index % 2) * 1024 + (1024 - image.width) // 2
+        y = (index // 2) * 1024 + (1024 - image.height) // 2
+        canvas.paste(image, (x, y))
+    output = BytesIO()
+    canvas.save(output, format="JPEG", quality=85)
+    return output.getvalue(), canvas.width, canvas.height
 
 
 async def oembed(request):
@@ -323,6 +420,7 @@ def create_app(extractor=None, base_url=None, client_session=None):
     app["extractions"] = ExtractionCache(extractor or Extractor(_cookies_file()))
     app["client_session"] = client_session
     app["owns_session"] = False
+    app["grid_locks"] = {}
     app.on_startup.append(_make_session)
     app.on_cleanup.append(_close_session)
     code = r"{shortcode:[A-Za-z0-9_-]{5,32}}"
