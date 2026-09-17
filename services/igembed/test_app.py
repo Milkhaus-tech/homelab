@@ -197,6 +197,18 @@ async def run_tests():
             assert "photo caption (3 photos)" in body
             assert '<meta property="og:image:width" content="2048">' in body
             assert '<meta property="og:image:height" content="2048">' in body
+        # A seven-photo carousel: every photo fetched, 3 columns x 3 rows.
+        image_hits.clear()
+        urls = [str(image_server.make_url(f"/{index}.jpg")) for index in range(3)] * 2 + [
+            str(image_server.make_url("/0.jpg"))
+        ]
+        seven = dict(PHOTO_RESULT, thumbnail_url=urls[0], images=urls)
+        async with TestClient(TestServer(create_app(FakeExtractor(seven), BASE))) as client:
+            response = await client.get(f"/image/{ID}")
+            assert response.status == 200
+            with Image.open(BytesIO(await response.read())) as grid:
+                assert grid.size == (3 * (2048 // 3), 3 * (2048 // 3))
+            assert len(image_hits) == 7
     finally:
         await image_server.close()
 

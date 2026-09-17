@@ -355,7 +355,7 @@ async def image_route(request):
         async with lock:
             if result.get("grid") is None:
                 blobs = await asyncio.gather(*[
-                    _fetch_image(request.app["client_session"], url) for url in images[:4]
+                    _fetch_image(request.app["client_session"], url) for url in images[:20]
                 ])
                 grid, width, height = await asyncio.to_thread(_make_grid, blobs)
                 result["grid"] = grid
@@ -392,18 +392,18 @@ async def _fetch_image(session, url):
 
 
 def _make_grid(blobs):
-    images = []
-    for blob in blobs:
+    """Every photo of a carousel on one canvas; Discord shows one image per link."""
+    columns = 2 if len(blobs) <= 4 else 3 if len(blobs) <= 9 else 4
+    cell = 2048 // columns
+    rows = -(-len(blobs) // columns)
+    canvas = Image.new("RGB", (columns * cell, rows * cell), "white")
+    for index, blob in enumerate(blobs):
         with Image.open(BytesIO(blob)) as source:
             image = source.convert("RGB")
-            image.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-            images.append(image.copy())
-    rows = 1 if len(images) == 2 else 2
-    canvas = Image.new("RGB", (2048, rows * 1024), "white")
-    for index, image in enumerate(images):
-        x = (index % 2) * 1024 + (1024 - image.width) // 2
-        y = (index // 2) * 1024 + (1024 - image.height) // 2
-        canvas.paste(image, (x, y))
+            image.thumbnail((cell, cell), Image.Resampling.LANCZOS)
+            x = (index % columns) * cell + (cell - image.width) // 2
+            y = (index // columns) * cell + (cell - image.height) // 2
+            canvas.paste(image, (x, y))
     output = BytesIO()
     canvas.save(output, format="JPEG", quality=85)
     return output.getvalue(), canvas.width, canvas.height
