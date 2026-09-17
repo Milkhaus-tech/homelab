@@ -199,6 +199,11 @@ def _escape(value):
     return html.escape(str(value), quote=True)
 
 
+def _username(result):
+    value = result.get("channel") or result.get("uploader_id") or result.get("uploader") or "Instagram"
+    return str(value).removeprefix("@")
+
+
 def render_og(shortcode, result, base_url):
     instagram_url = f"https://www.instagram.com/reel/{shortcode}/"
     if _failed(result):
@@ -211,8 +216,7 @@ def render_og(shortcode, result, base_url):
             '</head><body></body></html>'
         )
 
-    username = result.get("channel") or result.get("uploader_id") or result.get("uploader") or "Instagram"
-    username = username if str(username).startswith("@") else f"@{username}"
+    username = f"@{_username(result)}"
     description = (result.get("description") or "")[:300]
     video_url = f"{base_url}/video/{shortcode}"
     image_url = f"{base_url}/image/{shortcode}"
@@ -310,6 +314,10 @@ async def proxy(request, kind):
     if not upstream_url:
         return web.Response(status=502, text=f"{kind} unavailable")
     LOG.info("proxy id=%s kind=%s method=%s", shortcode, kind, request.method)
+    return await _stream(request, upstream_url, "video/mp4" if kind == "video" else "image/jpeg")
+
+
+async def _stream(request, upstream_url, default_type):
     headers = {}
     if "Range" in request.headers:
         headers["Range"] = request.headers["Range"]
@@ -323,7 +331,7 @@ async def proxy(request, kind):
             for name in ("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges"):
                 if name in upstream.headers:
                     response_headers[name] = upstream.headers[name]
-            response_headers.setdefault("Content-Type", "video/mp4" if kind == "video" else "image/jpeg")
+            response_headers.setdefault("Content-Type", default_type)
             response = web.StreamResponse(status=upstream.status, headers=response_headers)
             await response.prepare(request)
             if request.method != "HEAD":
@@ -332,7 +340,7 @@ async def proxy(request, kind):
             await response.write_eof()
             return response
     except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-        LOG.warning("proxy id=%s kind=%s error=%s", shortcode, kind, exc)
+        LOG.warning("proxy path=%s error=%s", request.path, exc)
         return web.Response(status=502, text="upstream failure")
 
 
@@ -373,6 +381,48 @@ async def image_route(request):
     except Exception as exc:
         LOG.warning("grid id=%s error=%s; falling back", shortcode, exc)
         return await proxy(request, "thumbnail")
+
+
+async def api_route(request):
+    shortcode = request.match_info["shortcode"]
+    result = await request.app["extractions"].get(shortcode)
+    headers = {"Cache-Control": "no-store"}
+    if _failed(result):
+        headers["X-Igembed-Error"] = result
+        return web.json_response({"ok": False, "error": result}, headers=headers)
+    base_url = request.app["base_url"]
+    is_video = bool(result.get("video_url"))
+    images = [result.get("thumbnail_url")] if is_video else (result.get("images") or [])
+    return web.json_response({
+        "ok": True,
+        "kind": "video" if is_video else "photo",
+        "shortcode": shortcode,
+        "post_url": f"https://www.instagram.com/p/{shortcode}/",
+        "username": _username(result),
+        "description": result.get("description") or "",
+        "like_count": result.get("like_count"),
+        "comment_count": result.get("comment_count"),
+        "video_url": f"{base_url}/video/{shortcode}" if is_video else None,
+        "images": [f"{base_url}/image/{shortcode}/{index}" for index in range(1, len(images) + 1)],
+    }, headers=headers)
+
+
+async def individual_image_route(request):
+    shortcode = request.match_info["shortcode"]
+    index = int(request.match_info["number"])
+    result = await request.app["extractions"].get(shortcode)
+    if _failed(result):
+        return web.Response(
+            status=502, text="image unavailable", headers={"X-Igembed-Error": result},
+        )
+    if result.get("video_url"):
+        images = [result.get("thumbnail_url")]
+    else:
+        images = result.get("images") or []
+    if index > len(images) or not images[index - 1]:
+        raise web.HTTPNotFound()
+    LOG.info("proxy id=%s kind=image/%d method=%s", shortcode, index, request.method)
+    return await _stream(request, images[index - 1], "image/jpeg")
 
 
 async def _fetch_image(session, url):
@@ -460,10 +510,14 @@ def create_app(extractor=None, base_url=None, client_session=None):
     app.router.add_get("/", root)
     app.router.add_get("/healthz", healthz)
     app.router.add_get("/oembed", oembed)
+    app.router.add_get(f"/api/{code}", api_route)
     app.router.add_get(f"/video/{code}", video_route, allow_head=False)
     app.router.add_head(f"/video/{code}", video_route)
     app.router.add_get(f"/image/{code}", image_route, allow_head=False)
     app.router.add_head(f"/image/{code}", image_route)
+    number = r"{number:[1-9][0-9]*}"
+    app.router.add_get(f"/image/{code}/{number}", individual_image_route, allow_head=False)
+    app.router.add_head(f"/image/{code}/{number}", individual_image_route)
     app.router.add_route("*", "/{tail:.*}", post_route)
     return app
 

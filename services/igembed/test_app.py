@@ -59,6 +59,18 @@ def jpeg(size, color):
 
 async def run_tests():
     async with TestClient(TestServer(create_app(FakeExtractor(RESULT), BASE))) as client:
+        response = await client.get(f"/api/{ID}")
+        payload = await response.json()
+        assert response.status == 200
+        assert response.headers["Cache-Control"] == "no-store"
+        assert payload["ok"] is True
+        assert payload["kind"] == "video"
+        assert payload["video_url"] == f"{BASE}/video/{ID}"
+        assert payload["images"] == [f"{BASE}/image/{ID}/1"]
+        assert payload["username"] == "tester"
+        assert payload["like_count"] == 27781
+        assert payload["comment_count"] == 512
+
         response = await client.get(f"/reel/{ID}/", headers={"User-Agent": "Discordbot/2.0"})
         body = await response.text()
         assert response.status == 200
@@ -75,6 +87,8 @@ async def run_tests():
             assert response.headers["Location"] == f"/video/{ID}"
 
         assert (await client.get("/reel/no/", headers={"User-Agent": "Discordbot"})).status == 404
+        assert (await client.get("/api/no")).status == 404
+        assert (await client.get(f"/image/{ID}/0")).status == 404
         assert (await client.get(f"/someone/tv/{ID}", headers={"User-Agent": "Discordbot"})).status == 200
         response = await client.get(f"/someone/reel/{ID}", headers={"User-Agent": "Slackbot"})
         assert response.status == 200
@@ -112,6 +126,10 @@ async def run_tests():
             assert response.status == 200
             assert response.headers["X-Igembed-Error"] == classification
             assert description in await response.text()
+            response = await client.get(f"/api/{ID}")
+            assert response.status == 200
+            assert await response.json() == {"ok": False, "error": classification}
+            assert response.headers["X-Igembed-Error"] == classification
             for path in (f"/video/{ID}", f"/image/{ID}"):
                 response = await client.get(path)
                 assert response.status == 502
@@ -133,6 +151,8 @@ async def run_tests():
 
     seen = {}
 
+    thumbnail_hits = []
+
     async def cdn(request):
         seen["range"] = request.headers.get("Range")
         return web.Response(
@@ -145,11 +165,20 @@ async def run_tests():
             },
         )
 
+    async def thumbnail_cdn(request):
+        thumbnail_hits.append(request.path)
+        return web.Response(body=b"thumbnail", content_type="image/jpeg")
+
     cdn_app = web.Application()
     cdn_app.router.add_get("/video.mp4", cdn)
+    cdn_app.router.add_get("/thumb.jpg", thumbnail_cdn)
     cdn_server = TestServer(cdn_app)
     await cdn_server.start_server()
-    proxy_result = dict(RESULT, video_url=str(cdn_server.make_url("/video.mp4")))
+    proxy_result = dict(
+        RESULT,
+        video_url=str(cdn_server.make_url("/video.mp4")),
+        thumbnail_url=str(cdn_server.make_url("/thumb.jpg")),
+    )
     try:
         async with TestClient(TestServer(create_app(FakeExtractor(proxy_result), BASE))) as client:
             response = await client.get(f"/video/{ID}", headers={"Range": "bytes=0-100"})
@@ -162,6 +191,11 @@ async def run_tests():
             assert response.status == 206
             assert response.headers["Content-Range"] == "bytes 0-100/1000"
             assert seen["range"] == "bytes=0-100"
+            response = await client.get(f"/image/{ID}/1")
+            assert response.status == 200
+            assert await response.read() == b"thumbnail"
+            assert thumbnail_hits == ["/thumb.jpg"]
+            assert (await client.get(f"/image/{ID}/2")).status == 404
     finally:
         await cdn_server.close()
 
@@ -183,6 +217,19 @@ async def run_tests():
         urls = [str(image_server.make_url(f"/{index}.jpg")) for index in range(3)]
         grid_result = dict(PHOTO_RESULT, thumbnail_url=urls[0], images=urls)
         async with TestClient(TestServer(create_app(FakeExtractor(grid_result), BASE))) as client:
+            response = await client.get(f"/api/{ID}")
+            payload = await response.json()
+            assert payload["kind"] == "photo"
+            assert payload["video_url"] is None
+            assert payload["images"] == [
+                f"{BASE}/image/{ID}/1", f"{BASE}/image/{ID}/2", f"{BASE}/image/{ID}/3",
+            ]
+            response = await client.get(f"/image/{ID}/2")
+            assert response.status == 200
+            assert await response.read() == image_data[1]
+            assert image_hits == [1]
+            assert (await client.get(f"/image/{ID}/4")).status == 404
+            image_hits.clear()
             response = await client.get(f"/image/{ID}")
             assert response.status == 200
             assert response.headers["Content-Type"] == "image/jpeg"

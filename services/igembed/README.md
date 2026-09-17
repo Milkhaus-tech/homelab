@@ -6,6 +6,13 @@ while people are redirected to Instagram.
 
 Photo posts and carousels embed as images (carousels use a stitched grid of the first four); `ignore_no_formats_error` lets yt-dlp remain the only extractor.
 
+Routes:
+
+- `GET /api/<id>` returns post metadata and bot-friendly media URLs as JSON.
+- `GET`/`HEAD /image/<id>/<n>` proxies one 1-based carousel image or a video's thumbnail.
+
+A bot can use `/api/<id>` to post a photo carousel as individual images; Discord shows up to four images per embed group.
+
 Run it with `docker compose up -d --build`. To update yt-dlp, rebuild from a fresh
 base and package install:
 
