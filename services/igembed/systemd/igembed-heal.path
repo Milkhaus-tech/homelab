@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for an igembed healing request
+
+[Path]
+PathExists=/home/noah/discordbot/teto-private/data/igembed.heal
+Unit=igembed-heal.service
+
+[Install]
+WantedBy=multi-user.target

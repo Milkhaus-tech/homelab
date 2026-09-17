@@ -1,0 +1,10 @@
+[Unit]
+Description=Heal the igembed service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/noah/homelab/services/igembed
+ExecStart=/home/noah/homelab/services/igembed/heal.sh
+TimeoutStartSec=300

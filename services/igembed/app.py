@@ -29,6 +29,11 @@ CDN_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 )
+FAILURE_DESCRIPTIONS = {
+    "auth": "Instagram won't show this post without a login",
+    "gone": "this post is unavailable",
+    "error": "couldn't fetch this post",
+}
 
 
 class Extractor:
@@ -142,11 +147,11 @@ class ExtractionCache:
                         "extraction id=%s outcome=failure ms=%d error=%s",
                         shortcode, (time.monotonic() - started) * 1000, exc,
                     )
-                    result = None
-            ttl = 3600 if result else 300
+                    result = _classify_failure(str(exc))
+            ttl = 300 if _failed(result) else 3600
             self.cache[shortcode] = (time.monotonic() + ttl, result)
             self._trim()
-            if result:
+            if not _failed(result):
                 LOG.info(
                     "extraction id=%s outcome=success ms=%d",
                     shortcode, (time.monotonic() - started) * 1000,
@@ -172,17 +177,35 @@ def _valid_shortcode(value):
     return bool(SHORTCODE_RE.fullmatch(value))
 
 
+def _classify_failure(message):
+    message = message.lower()
+    if any(marker in message for marker in (
+        "login", "cookies", "empty media response", "not granting access", "rate-limit",
+    )):
+        return "auth"
+    if any(marker in message for marker in (
+        "not found", "does not exist", "unavailable", "removed", "private",
+    )):
+        return "gone"
+    return "error"
+
+
+def _failed(result):
+    return isinstance(result, str)
+
+
 def _escape(value):
     return html.escape(str(value), quote=True)
 
 
 def render_og(shortcode, result, base_url):
     instagram_url = f"https://www.instagram.com/reel/{shortcode}/"
-    if not result:
+    if _failed(result):
+        description = FAILURE_DESCRIPTIONS[result]
         return (
             '<!DOCTYPE html><html><head><meta charset="utf-8">'
             '<meta property="og:title" content="Instagram">'
-            '<meta property="og:description" content="couldn&#x27;t fetch this post">'
+            f'<meta property="og:description" content="{_escape(description)}">'
             f'<meta http-equiv="refresh" content="0; url={_escape(instagram_url)}">'
             '</head><body></body></html>'
         )
@@ -260,12 +283,13 @@ async def post_route(request):
     LOG.info("post id=%s class=%s ua=%r", shortcode, classification, ua)
     if media:
         result = await request.app["extractions"].get(shortcode)
-        kind = "image" if result and not result.get("video_url") else "video"
+        kind = "image" if not _failed(result) and not result.get("video_url") else "video"
         raise web.HTTPFound(f"/{kind}/{shortcode}")
     if bot:
         result = await request.app["extractions"].get(shortcode)
         page = render_og(shortcode, result, request.app["base_url"])
-        return web.Response(text=page, content_type="text/html")
+        headers = {"X-Igembed-Error": result} if _failed(result) else None
+        return web.Response(text=page, content_type="text/html", headers=headers)
     target = f"https://www.instagram.com{request.path}"
     if request.query_string:
         target += f"?{request.query_string}"
@@ -277,7 +301,11 @@ async def proxy(request, kind):
     if not _valid_shortcode(shortcode):
         raise web.HTTPNotFound()
     result = await request.app["extractions"].get(shortcode)
-    upstream_url = result and result.get(f"{kind}_url")
+    if _failed(result):
+        return web.Response(
+            status=502, text=f"{kind} unavailable", headers={"X-Igembed-Error": result},
+        )
+    upstream_url = result.get(f"{kind}_url")
     if not upstream_url:
         return web.Response(status=502, text=f"{kind} unavailable")
     LOG.info("proxy id=%s kind=%s method=%s", shortcode, kind, request.method)
@@ -314,7 +342,11 @@ async def video_route(request):
 async def image_route(request):
     shortcode = request.match_info["shortcode"]
     result = await request.app["extractions"].get(shortcode)
-    images = result and result.get("images")
+    if _failed(result):
+        return web.Response(
+            status=502, text="image unavailable", headers={"X-Igembed-Error": result},
+        )
+    images = result.get("images")
     if not images or len(images) == 1:
         return await proxy(request, "thumbnail")
     lock = request.app["grid_locks"].setdefault(shortcode, asyncio.Lock())

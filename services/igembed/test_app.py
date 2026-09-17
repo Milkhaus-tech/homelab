@@ -90,10 +90,31 @@ async def run_tests():
             "version": "1.0",
         }
 
-    async with TestClient(TestServer(create_app(FakeExtractor(RuntimeError("gone")), BASE))) as client:
-        response = await client.get(f"/reel/{ID}", headers={"User-Agent": "Discordbot"})
-        assert response.status == 200
-        assert "couldn&#x27;t fetch this post" in await response.text()
+    failures = (
+        ("please LOGIN to view this private post", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("cookies are required", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("empty media response", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("site is not granting access", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("rate-limit reached", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("post not found", "gone", "this post is unavailable"),
+        ("post does not exist", "gone", "this post is unavailable"),
+        ("post unavailable", "gone", "this post is unavailable"),
+        ("post was removed", "gone", "this post is unavailable"),
+        ("this post is private", "gone", "this post is unavailable"),
+        ("unexpected extractor failure", "error", "couldn&#x27;t fetch this post"),
+    )
+    for message, classification, description in failures:
+        async with TestClient(TestServer(
+            create_app(FakeExtractor(RuntimeError(message)), BASE)
+        )) as client:
+            response = await client.get(f"/reel/{ID}", headers={"User-Agent": "Discordbot"})
+            assert response.status == 200
+            assert response.headers["X-Igembed-Error"] == classification
+            assert description in await response.text()
+            for path in (f"/video/{ID}", f"/image/{ID}"):
+                response = await client.get(path)
+                assert response.status == 502
+                assert response.headers["X-Igembed-Error"] == classification
 
     async with TestClient(TestServer(create_app(FakeExtractor(PHOTO_RESULT), BASE))) as client:
         response = await client.get(f"/p/{ID}/", headers={"User-Agent": "Discordbot/2.0"})
