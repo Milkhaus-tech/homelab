@@ -1,0 +1,13 @@
+services:
+  igembed:
+    build: .
+    container_name: igembed
+    restart: unless-stopped
+    cpuset: "0-9"      # keep off cores 10-15, reserved for game servers
+    ports:
+      - "8095:8080"
+    environment:
+      - PUBLIC_BASE_URL=https://ig.milkhaus.net
+      # - IG_COOKIES_FILE=/cookies.txt
+    # volumes:
+      # - ./cookies.txt:/cookies.txt:ro
