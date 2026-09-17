@@ -443,7 +443,7 @@ async def _fetch_image(session, url):
 
 def _make_grid(blobs):
     """Every photo of a carousel on one canvas; Discord shows one image per link."""
-    columns = 2 if len(blobs) <= 4 else 3 if len(blobs) <= 9 else 4
+    columns = 2 if len(blobs) <= 4 else 3
     cell = 2048 // columns
     rows = -(-len(blobs) // columns)
     canvas = Image.new("RGB", (columns * cell, rows * cell), "white")
