@@ -101,6 +101,7 @@ async def run_tests():
         ("post unavailable", "gone", "this post is unavailable"),
         ("post was removed", "gone", "this post is unavailable"),
         ("this post is private", "gone", "this post is unavailable"),
+        ("Video info extraction failed: HTTP Error 400: Bad Request", "gone", "this post is unavailable"),
         ("unexpected extractor failure", "error", "couldn&#x27;t fetch this post"),
     )
     for message, classification, description in failures:

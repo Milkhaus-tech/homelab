@@ -185,6 +185,7 @@ def _classify_failure(message):
         return "auth"
     if any(marker in message for marker in (
         "not found", "does not exist", "unavailable", "removed", "private",
+        "http error 400", "http error 404",
     )):
         return "gone"
     return "error"
