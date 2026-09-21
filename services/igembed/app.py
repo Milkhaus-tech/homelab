@@ -15,6 +15,13 @@ from PIL import Image
 
 
 LOG = logging.getLogger("igembed")
+STATIC_DIR = Path(__file__).with_name("static")
+ASSET_TYPES = {
+    "index.html": "text/html",
+    "teto-pattern.svg": "image/svg+xml",
+    "teto-shocked.png": "image/png",
+    "og.png": "image/png",
+}
 SHORTCODE_RE = re.compile(r"^[A-Za-z0-9_-]{5,32}$")
 POST_RE = re.compile(
     r"^/(?:(?:reel|reels|p|tv)/([A-Za-z0-9_-]{5,32})|"
@@ -471,11 +478,16 @@ async def oembed(request):
     })
 
 
-async def root(_request):
-    return web.Response(
-        text="Replace instagram.com with ig.milkhaus.net in a reel link and Discord will embed the video.",
-        content_type="text/html",
-    )
+async def root(request):
+    return web.Response(body=request.app["landing_page"], content_type="text/html")
+
+
+async def asset_route(request):
+    filename = request.match_info["filename"]
+    content_type = ASSET_TYPES.get(filename)
+    if content_type is None:
+        raise web.HTTPNotFound()
+    return web.FileResponse(STATIC_DIR / filename, headers={"Content-Type": content_type})
 
 
 async def healthz(_request):
@@ -499,6 +511,7 @@ async def _close_session(app):
 
 def create_app(extractor=None, base_url=None, client_session=None):
     app = web.Application()
+    app["landing_page"] = (STATIC_DIR / "index.html").read_bytes()
     app["base_url"] = (base_url or os.getenv("PUBLIC_BASE_URL", "https://ig.milkhaus.net")).rstrip("/")
     app["extractions"] = ExtractionCache(extractor or Extractor(_cookies_file()))
     app["client_session"] = client_session
@@ -508,6 +521,7 @@ def create_app(extractor=None, base_url=None, client_session=None):
     app.on_cleanup.append(_close_session)
     code = r"{shortcode:[A-Za-z0-9_-]{5,32}}"
     app.router.add_get("/", root)
+    app.router.add_get(r"/assets/{filename:[A-Za-z0-9._-]+}", asset_route)
     app.router.add_get("/healthz", healthz)
     app.router.add_get("/oembed", oembed)
     app.router.add_get(f"/api/{code}", api_route)

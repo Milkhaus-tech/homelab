@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <!-- Kasane Teto motifs: drill twintails, her baguette, an eighth note (UTAU). -->
+  <defs>
+    <g id="drill">
+      <path d="M0,0 a16,8 0 1,0 0,16 a12,6 0 1,1 0,12 a8.5,4.4 0 1,0 0,9 a5.5,3 0 1,1 0,6.5 a3,1.8 0 1,0 0,4"/>
+    </g>
+    <g id="bread">
+      <path d="M0,0 h30 a5.5,5.5 0 0,1 0,11 h-30 a5.5,5.5 0 0,1 0,-11 z"/>
+      <path d="M7,2.6 l3.4,5.8 M14,2.6 l3.4,5.8 M21,2.6 l3.4,5.8"/>
+    </g>
+    <g id="note">
+      <path d="M0,25 a5,3.8 0 1,0 8,0 a5,3.8 0 1,0 -8,0"/>
+      <path d="M8,25 V1 c7,2.4 10.5,5.6 9,11"/>
+    </g>
+  </defs>
+  <g fill="none" stroke="#ff9aa8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#drill" x="38" y="26"/>
+    <use href="#bread" x="196" y="58" transform="rotate(-28 196 58)"/>
+    <use href="#note"  x="120" y="132" transform="rotate(7 120 132)"/>
+    <use href="#drill" x="244" y="176" transform="rotate(-8 244 176)"/>
+    <use href="#bread" x="26"  y="228" transform="rotate(15 26 228)"/>
+  </g>
+</svg>

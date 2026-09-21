@@ -7,6 +7,7 @@ import os
 import re
 import time
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlencode
 
 import aiohttp
@@ -16,6 +17,13 @@ from PIL import Image
 
 
 LOG = logging.getLogger("xembed")
+STATIC_DIR = Path(__file__).with_name("static")
+ASSET_TYPES = {
+    "index.html": "text/html",
+    "teto-pattern.svg": "image/svg+xml",
+    "teto-shocked.png": "image/png",
+    "og.png": "image/png",
+}
 ID_RE = re.compile(r"^[0-9]+$")
 POST_RE = re.compile(
     r"^/(?:([A-Za-z0-9_]{1,15})/status/([0-9]+)(?:/(?:photo|video)/[0-9]+)?|"
@@ -451,8 +459,16 @@ async def oembed(request):
     })
 
 
-async def root(_request):
-    return web.Response(text="Replace x.com with x.milkhaus.net in a post URL and Discord will embed its media.", content_type="text/html")
+async def root(request):
+    return web.Response(body=request.app["landing_page"], content_type="text/html")
+
+
+async def asset_route(request):
+    filename = request.match_info["filename"]
+    content_type = ASSET_TYPES.get(filename)
+    if content_type is None:
+        raise web.HTTPNotFound()
+    return web.FileResponse(STATIC_DIR / filename, headers={"Content-Type": content_type})
 
 
 async def healthz(_request):
@@ -474,6 +490,7 @@ async def _close_session(app):
 
 def create_app(extractor=None, base_url=None, client_session=None):
     app = web.Application()
+    app["landing_page"] = (STATIC_DIR / "index.html").read_bytes()
     app["base_url"] = (base_url or os.getenv("PUBLIC_BASE_URL", "https://x.milkhaus.net")).rstrip("/")
     app["extractions"] = ExtractionCache(extractor or Extractor())
     app["client_session"], app["owns_session"], app["grid_locks"] = client_session, False, {}
@@ -481,6 +498,7 @@ def create_app(extractor=None, base_url=None, client_session=None):
     app.on_cleanup.append(_close_session)
     code = r"{id:[0-9]+}"
     app.router.add_get("/", root)
+    app.router.add_get(r"/assets/{filename:[A-Za-z0-9._-]+}", asset_route)
     app.router.add_get("/healthz", healthz)
     app.router.add_get("/oembed", oembed)
     app.router.add_get(f"/api/{code}", api_route)

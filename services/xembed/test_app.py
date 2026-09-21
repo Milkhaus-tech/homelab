@@ -6,6 +6,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from PIL import Image
 
 from app import BOT_MARKERS, POST_RE, _make_grid, create_app, tweet_token
+from test_page import run_checks as run_page_checks
 
 
 ID = "1732824684683784516"
@@ -52,6 +53,14 @@ def jpeg(size, color):
 async def api_and_routes():
     video = result()
     async with TestClient(TestServer(create_app(FakeExtractor(video), BASE))) as client:
+        response = await client.get("/")
+        check(response.status == 200 and "<title>TETO ZONE — X / Twitter embeds</title>" in await response.text())
+        check((await client.head("/")).status == 200)
+        response = await client.get("/assets/og.png")
+        check(response.status == 200 and response.headers["Content-Type"] == "image/png")
+        check((await client.get("/assets/nope")).status == 404)
+        check((await client.get("/assets/../app.py")).status == 404)
+
         response = await client.get(f"/api/{ID}")
         payload = await response.json()
         check(response.status == 200 and response.headers["Cache-Control"] == "no-store")
@@ -165,5 +174,6 @@ async def run_tests():
 
 
 if __name__ == "__main__":
+    run_page_checks()
     asyncio.run(run_tests())
     print(f"{TESTS} tests passed")

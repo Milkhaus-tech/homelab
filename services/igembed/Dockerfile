@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir aiohttp yt-dlp Pillow \
 
 WORKDIR /app
 COPY --chown=igembed:igembed app.py /app/app.py
+COPY --chown=igembed:igembed static /app/static
 USER igembed
 
 CMD ["python", "app.py"]

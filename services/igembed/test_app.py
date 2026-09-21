@@ -6,6 +6,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from PIL import Image
 
 from app import create_app
+from test_page import run_checks as run_page_checks
 
 
 ID = "DdG5ctQhWco"
@@ -59,6 +60,16 @@ def jpeg(size, color):
 
 async def run_tests():
     async with TestClient(TestServer(create_app(FakeExtractor(RESULT), BASE))) as client:
+        response = await client.get("/")
+        assert response.status == 200
+        assert "<title>TETO ZONE — Instagram embeds</title>" in await response.text()
+        response = await client.head("/")
+        assert response.status == 200
+        response = await client.get("/assets/og.png")
+        assert response.status == 200 and response.headers["Content-Type"] == "image/png"
+        assert (await client.get("/assets/nope")).status == 404
+        assert (await client.get("/assets/../app.py")).status == 404
+
         response = await client.get(f"/api/{ID}")
         payload = await response.json()
         assert response.status == 200
@@ -286,5 +297,6 @@ async def run_tests():
 
 
 if __name__ == "__main__":
+    run_page_checks()
     asyncio.run(run_tests())
     print("all tests passed")

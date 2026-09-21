@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Generate both landing pages from one template; runtime does not use this file."""
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+SITES = {
+    "igembed": {
+        "title": "TETO ZONE — Instagram embeds",
+        "sub": "Instagram · embeds for Discord",
+        "description": "Replace instagram.com with ig.milkhaus.net. Videos play inline in Discord; photo carousels show as a grid. Browser clicks go to Instagram.",
+        "url": "https://ig.milkhaus.net/", "host": "ig.milkhaus.net",
+        "alt": "TETO ZONE — Instagram embeds for Discord. ig.milkhaus.net. Kasane Teto, alarmed.",
+        "lead": "Put the reel in the chat.",
+        "manual": "Replace instagram.com with ig.milkhaus.net in a reel or post link. Keep the rest. Paste it into Discord.",
+        "bot": "In Teto's Casino, paste the ordinary Instagram link. Teto reposts it with the address changed.",
+        "label": "instagram link", "placeholder": "https://www.instagram.com/reel/SHORTCODE/",
+        "helper": "Reels and posts. The link changes here in your browser.",
+        "invalid": "not an Instagram post link. paste a full reel or post URL from instagram.com.",
+        "hosts": '["instagram.com","www.instagram.com","m.instagram.com","ig.milkhaus.net"]',
+        "regex": r"^\/(?:[A-Za-z0-9._]+\/)?(?:reel|reels|p|tv)\/[A-Za-z0-9_-]{5,32}\/?$",
+        "cards": [("VIDEO", "plays inline", "Watch the video in Discord."),
+                  ("PHOTOS", "the whole carousel", "Photo carousels appear as a grid, up to 20 photos. Teto can post the photos individually."),
+                  ("OPEN LINK", "the real post", "Open the link in a browser and you're sent to Instagram.")],
+        "sibling_title": "TETO ZONE also fixes X / Twitter",
+        "sibling_desc": "Videos, photos and text previews for Discord.",
+        "sibling_go": "x.milkhaus.net →", "sibling_href": "https://x.milkhaus.net/",
+    },
+    "xembed": {
+        "title": "TETO ZONE — X / Twitter embeds",
+        "sub": "X / Twitter · embeds for Discord",
+        "description": "Replace x.com or twitter.com with x.milkhaus.net. Videos, photos, text and counts in Discord. Browser clicks go to X.",
+        "url": "https://x.milkhaus.net/", "host": "x.milkhaus.net",
+        "alt": "TETO ZONE — X / Twitter embeds for Discord. x.milkhaus.net. Kasane Teto, alarmed.",
+        "lead": "Put the post in the chat.",
+        "manual": "Replace x.com or twitter.com with x.milkhaus.net in a post link. Keep the rest. Paste it into Discord.",
+        "bot": "In Teto's Casino, paste the ordinary X / Twitter link. Teto reposts it with the address changed.",
+        "label": "x / twitter link", "placeholder": "https://x.com/username/status/1234567890",
+        "helper": "Post links from x.com or twitter.com. The link changes here in your browser.",
+        "invalid": "not an X / Twitter post link. paste a full status URL from x.com or twitter.com.",
+        "hosts": '["x.com","www.x.com","mobile.x.com","twitter.com","www.twitter.com","mobile.twitter.com","x.milkhaus.net"]',
+        "regex": r"^\/(?:[A-Za-z0-9_]{1,15}\/status\/[0-9]+(?:\/(?:photo|video)\/[0-9]+)?|i\/(?:web\/)?status\/[0-9]+)\/?$",
+        "cards": [("VIDEO", "plays inline", "Watch videos and GIFs in Discord."),
+                  ("POSTS", "photos + text", "Photo posts show up to four images in a grid. Text previews include ❤️ likes and 💬 replies when available."),
+                  ("OPEN LINK", "the real post", "Open the link in a browser and you're sent to X.")],
+        "sibling_title": "TETO ZONE also fixes Instagram",
+        "sibling_desc": "Reels, posts and photo carousels for Discord.",
+        "sibling_go": "ig.milkhaus.net →", "sibling_href": "https://ig.milkhaus.net/",
+    },
+}
+
+TEMPLATE = r'''<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@@title@@</title>
+<meta name="description" content="@@description@@">
+<link rel="canonical" href="@@url@@">
+<meta property="og:site_name" content="MilkHaus">
+<meta property="og:type" content="website">
+<meta property="og:url" content="@@url@@">
+<meta property="og:title" content="@@title@@">
+<meta property="og:description" content="@@description@@">
+<meta property="og:image" content="@@url@@assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="@@alt@@">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="@@title@@">
+<meta name="twitter:description" content="@@description@@">
+<meta name="twitter:image" content="@@url@@assets/og.png">
+<meta name="twitter:image:alt" content="@@alt@@">
+<meta name="theme-color" content="#e21e37">
+<link rel="icon" type="image/png" href="/assets/teto-shocked.png">
+<style>
+:root{--bg:#0b0c0e;--panel:rgba(20,22,25,.84);--line:#23262b;--line-soft:#1b1e22;--ink:#e8eaed;--ink-2:#a8aeb6;--ink-3:#6d7480;--red:#e21e37;--red-l:#ff5c6c;--green:#3fbf6f;--amber:#d9a441;--mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box;min-width:0}html{background:var(--bg)}body{margin:0;background:transparent;color:var(--ink);font-family:var(--sans);line-height:1.55}body::before,body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}body::before{background:radial-gradient(58% 44% at 82% -6%,rgba(226,30,55,.26) 0%,transparent 68%),radial-gradient(52% 40% at 8% 4%,rgba(226,30,55,.30) 0%,transparent 70%),radial-gradient(70% 50% at 50% 108%,rgba(226,30,55,.18) 0%,transparent 72%),linear-gradient(180deg,#101013 0%,var(--bg) 55%)}body::after{inset:-320px;background:url("/assets/teto-pattern.svg") repeat;background-size:300px 300px;opacity:.075;will-change:transform;-webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 24%,#000 66%,transparent 96%);mask-image:linear-gradient(180deg,transparent 0%,#000 24%,#000 66%,transparent 96%)}
+@media (prefers-reduced-motion:no-preference){body::after{animation:drift 120s linear infinite}}@keyframes drift{to{transform:translate3d(300px,300px,0)}}
+.wrap{max-width:62rem;margin:0 auto;padding:2.5rem 1.25rem 4rem;display:flex;flex-direction:column;gap:2rem}header{display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:center;border-bottom:2px solid var(--red);padding-bottom:1.1rem}h1{margin:0;font-family:var(--mono);font-size:clamp(1.6rem,5vw,2.4rem);font-weight:600;letter-spacing:-.02em}h1 .z{color:var(--red)}.sub{margin:.35rem 0 0;color:var(--ink-2);font-size:.95rem}.peek{width:92px;height:92px;border-radius:10px;object-fit:cover;object-position:50% 32%;border:1px solid var(--line)}
+.connect{background:radial-gradient(120% 140% at 12% 0%,#1a1216 0%,var(--panel) 60%);border:1px solid var(--line);border-left:3px solid var(--red);padding:1.4rem 1.35rem}.connect .lead{font-size:1.02rem;color:var(--ink-2);margin:0 0 .7rem}.connect .lead b{color:var(--ink);font-weight:650}.instructions{margin:.8rem 0 0;color:var(--ink-2);font-size:.86rem}.instructions+p{margin-top:.35rem}
+.ipwrap{display:inline-flex;align-items:center;gap:.55rem;flex-wrap:wrap}.ip{position:relative;display:inline-block;font-family:var(--mono);font-weight:700;font-size:clamp(1.15rem,3.6vw,1.65rem);letter-spacing:.04em;color:#fff;padding:.42rem .95rem;border:1px solid #3a2026;border-radius:4px;background:#120e10;text-shadow:0 0 6px rgba(255,92,108,.55),0 0 18px rgba(226,30,55,.35);animation:hum 3.4s ease-in-out infinite}.ip::before,.ip::after{content:"";position:absolute;width:12px;height:12px;border:2px solid var(--red);animation:pulse 2.2s ease-in-out infinite}.ip::before{top:-4px;left:-4px;border-right:0;border-bottom:0}.ip::after{bottom:-4px;right:-4px;border-left:0;border-top:0}.ip .ghost{position:absolute;inset:.42rem .95rem;pointer-events:none;opacity:.55}.ip .ghost.r{color:#ff2d46;transform:translateX(-1px);mix-blend-mode:screen;animation:jitterA 4.1s steps(1) infinite}.ip .ghost.c{color:#28e0ff;transform:translateX(1px);mix-blend-mode:screen;animation:jitterB 5.3s steps(1) infinite}.ip .sheen{position:absolute;inset:0;overflow:hidden;border-radius:4px;pointer-events:none}.ip .sheen i{position:absolute;top:0;bottom:0;width:38%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.16),transparent);transform:translateX(-140%);animation:sweep 4.6s ease-in-out infinite}@keyframes hum{0%,100%{box-shadow:0 0 0 rgba(226,30,55,0)}50%{box-shadow:0 0 22px rgba(226,30,55,.28)}}@keyframes pulse{0%,100%{opacity:.45}50%{opacity:1}}@keyframes sweep{0%{transform:translateX(-140%)}55%,100%{transform:translateX(340%)}}@keyframes jitterA{0%,92%{transform:translateX(-1px)}94%{transform:translate(-3px,1px)}96%{transform:translate(2px,-1px)}98%{transform:translateX(-1px)}}@keyframes jitterB{0%,90%{transform:translateX(1px)}93%{transform:translate(3px,-1px)}95%{transform:translate(-2px,1px)}97%{transform:translateX(1px)}}
+button{min-height:44px}.copy{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;background:#20242a;color:var(--ink-2);border:1px solid var(--line);border-radius:3px;padding:.45rem .7rem;cursor:pointer}.copy:hover:not(:disabled){color:var(--ink);border-color:var(--red)}.copy.done{color:var(--green);border-color:var(--green)}.copy:disabled{cursor:not-allowed;opacity:.5}:focus-visible{outline:2px solid var(--red-l);outline-offset:3px}
+h2{margin:0 0 .75rem;font-family:var(--mono);font-size:1rem;font-weight:600;padding-bottom:.5rem;border-bottom:1px solid var(--line)}.rewriter{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);padding:1.25rem}.field-label{display:block;font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:.75rem 0 .35rem}.url-input{display:block;width:100%;min-height:44px;padding:.65rem .75rem;background:#101216;color:var(--ink);border:1px solid var(--line);border-radius:3px;font:16px var(--mono)}.helper,.status{font-size:.78rem;color:var(--ink-2);margin:.35rem 0 0}.output-row{display:grid;grid-template-columns:1fr auto;gap:.65rem;align-items:stretch}.output{padding:.65rem .75rem;border:1px solid var(--line);background:#101216;color:var(--ink-2);font-family:var(--mono);font-size:.86rem;overflow-wrap:anywhere;user-select:text}.status.error{color:var(--amber)}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;list-style:none;padding:0;margin:.75rem 0 0}.card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);padding:.85rem 1rem;display:flex;flex-direction:column;gap:.15rem}.card .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}.card .v{font-size:1.5rem;font-weight:650}.card .n{font-size:.75rem;color:var(--ink-2)}.others{display:flex;flex-direction:column;gap:.8rem}.other{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--red);padding:1rem 1.15rem;text-decoration:none;color:inherit}.other:hover{border-color:var(--red)}.other img{width:56px;height:56px;border-radius:8px;object-fit:cover;object-position:50% 32%}.other .t{font-weight:650;display:block}.other .d{font-size:.82rem;color:var(--ink-2);display:block}.other .go{font-family:var(--mono);font-size:.72rem;color:var(--red-l);white-space:normal;overflow-wrap:anywhere}footer{color:var(--ink-2);font-size:.78rem;font-family:var(--mono);border-top:1px solid var(--line);padding-top:1rem;display:flex;flex-direction:column;gap:.35rem}footer p{margin:0}footer a{color:var(--ink-2)}
+@media(max-width:640px){.wrap{padding:2.5rem 1rem 4rem;gap:1.5rem}.peek{width:66px;height:66px}.connect,.rewriter{padding:1rem}.cards{grid-template-columns:1fr}.output-row{grid-template-columns:1fr}.other{grid-template-columns:auto 1fr}.other .go{grid-column:2;display:block}}
+@media(prefers-reduced-motion:reduce){body::after,.ip,.ip::before,.ip::after,.ip .ghost,.ip .sheen i{animation:none}.ip .ghost,.ip .sheen{display:none}}
+</style>
+</head><body><main class="wrap">
+<header><div><h1>TETO <span class="z">ZONE</span></h1><p class="sub">@@sub@@</p></div><img class="peek" src="/assets/teto-shocked.png" alt="Kasane Teto, alarmed"></header>
+<section class="connect" aria-labelledby="how"><p class="lead" id="how"><b>@@lead@@</b></p><div class="ipwrap"><span class="ip" id="host">@@host@@<span class="ghost r" aria-hidden="true">@@host@@</span><span class="ghost c" aria-hidden="true">@@host@@</span><span class="sheen" aria-hidden="true"><i></i></span></span><button class="copy" id="copy-host" aria-label="Copy mirror address">COPY</button></div><p class="instructions">@@manual@@</p><p class="instructions">@@bot@@</p></section>
+<section class="rewriter" aria-labelledby="rewrite"><h2 id="rewrite">rewrite a link</h2><label class="field-label" for="source">@@label@@</label><input class="url-input" id="source" type="text" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="@@placeholder@@" aria-describedby="helper result-status"><p class="helper" id="helper">@@helper@@</p><span class="field-label">discord link</span><div class="output-row"><div class="output" id="output">your rewritten link appears here</div><button class="copy" id="copy-output" aria-label="Copy rewritten link" disabled>COPY LINK</button></div><p class="status" id="result-status"></p><noscript><p class="status error">automatic rewriting needs JavaScript. change the host using the instructions above.</p></noscript><span id="announcer" role="status" aria-live="polite" class="helper"></span></section>
+<section aria-labelledby="features"><h2 id="features">what you get</h2><ul class="cards">@@cards@@</ul></section>
+<nav class="others" aria-label="Other TETO ZONE services"><a class="other" href="@@sibling_href@@"><img src="/assets/teto-shocked.png" alt=""><span><span class="t">@@sibling_title@@</span><span class="d">@@sibling_desc@@</span></span><span class="go">@@sibling_go@@</span></a><a class="other" href="https://pz.milkhaus.net/"><img src="/assets/teto-shocked.png" alt=""><span><span class="t">TETO ZONE also runs Project Zomboid</span><span class="d">Who's online, where they are, how long they lasted.</span></span><span class="go">pz.milkhaus.net →</span></a></nav>
+<footer><p>no account needed here · nothing you paste into this rewriter is sent or stored by this page.</p><p>posts are fetched on demand · results are cached temporarily · the service logs requests.</p><p>Teto artwork from <a href="https://commons.wikimedia.org/wiki/File:BIRDBRAIN_(w_OK_Glass)_feat._Kasane_Teto.webm">BIRDBRAIN</a> by Jamie Paige, CC BY 3.0.</p></footer>
+</main><script>
+(() => {
+  // Keep this literal identical to PAGE_REGEX in test_page.py.
+  const pathPattern = /@@regex@@/;
+  const allowedHosts = new Set(@@hosts@@);
+  const mirror = "@@host@@";
+  const input = document.getElementById("source"), output = document.getElementById("output");
+  const outputButton = document.getElementById("copy-output"), status = document.getElementById("result-status");
+  const announcer = document.getElementById("announcer"), empty = "your rewritten link appears here";
+  function rewrite(value) {
+    let raw = value.trim();
+    if (!raw) return null;
+    if (/\s|[\u0000-\u001f\u007f]|\\/.test(raw) || raw.startsWith("//")) return false;
+    if (!/^https?:\/\//i.test(raw)) {
+      if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(raw)) return false;
+      const bareHost = raw.split(/[/?#]/, 1)[0].toLowerCase();
+      if (!allowedHosts.has(bareHost)) return false;
+      raw = "https://" + raw;
+    }
+    const authority = raw.replace(/^https?:\/\//i, "").split(/[/?#]/, 1)[0];
+    if (authority.includes("@") || /:\d+$/.test(authority)) return false;
+    const rawPath = raw.replace(/^https?:\/\/[^/?#]*/i, "").split(/[?#]/, 1)[0] || "/";
+    if (rawPath.includes("%") || rawPath.split("/").some(part => part === "." || part === "..")) return false;
+    let url;
+    try { url = new URL(raw); } catch (_) { return false; }
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password || url.port || !allowedHosts.has(url.hostname.toLowerCase()) || !pathPattern.test(url.pathname)) return false;
+    return "https://" + mirror + url.pathname;
+  }
+  function update() {
+    const result = rewrite(input.value);
+    if (result === null) { output.textContent = empty; outputButton.disabled = true; input.removeAttribute("aria-invalid"); status.textContent = ""; status.className = "status"; return; }
+    if (result === false) { output.textContent = empty; outputButton.disabled = true; input.setAttribute("aria-invalid", "true"); status.textContent = "@@invalid@@"; status.className = "status error"; return; }
+    output.textContent = result; outputButton.disabled = false; input.removeAttribute("aria-invalid"); status.textContent = "ready — copy it into Discord. post availability isn't checked here."; status.className = "status";
+  }
+  async function copy(button, textNode, success) {
+    const original = button.textContent;
+    try { await navigator.clipboard.writeText(textNode.textContent); button.textContent = "COPIED"; button.classList.add("done"); announcer.textContent = success; }
+    catch (_) { button.textContent = "SELECT IT"; const range = document.createRange(); range.selectNodeContents(textNode); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); announcer.textContent = "couldn't copy. select the text and copy it manually."; }
+    setTimeout(() => { button.textContent = original; button.classList.remove("done"); }, 2000);
+  }
+  input.addEventListener("input", update);
+  document.getElementById("copy-host").addEventListener("click", event => copy(event.currentTarget, document.getElementById("host").firstChild, "address copied."));
+  outputButton.addEventListener("click", event => copy(event.currentTarget, output, "link copied."));
+})();
+</script></body></html>
+'''
+
+
+def render(config):
+    values = dict(config)
+    values["cards"] = "".join(
+        f'<li class="card"><span class="k">{label}</span><span class="v">{main}</span><span class="n">{detail}</span></li>'
+        for label, main, detail in config["cards"]
+    )
+    page = TEMPLATE
+    for key, value in values.items():
+        if key != "cards" or isinstance(value, str):
+            page = page.replace(f"@@{key}@@", value)
+    if "@@" in page:
+        raise RuntimeError("unsubstituted template value")
+    return page
+
+
+if __name__ == "__main__":
+    for service, config in SITES.items():
+        destination = ROOT / service / "static" / "index.html"
+        destination.parent.mkdir(exist_ok=True)
+        destination.write_text(render(config))
+        print(destination)

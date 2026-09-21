@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir aiohttp yt-dlp Pillow \
 
 WORKDIR /app
 COPY --chown=xembed:xembed app.py /app/app.py
+COPY --chown=xembed:xembed static /app/static
 USER xembed
 
 CMD ["python", "app.py"]
