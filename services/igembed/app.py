@@ -20,6 +20,7 @@ ASSET_TYPES = {
     "index.html": "text/html",
     "teto-pattern.svg": "image/svg+xml",
     "teto-shocked.png": "image/png",
+    "teto-casino.png": "image/png",
     "og.png": "image/png",
 }
 SHORTCODE_RE = re.compile(r"^[A-Za-z0-9_-]{5,32}$")

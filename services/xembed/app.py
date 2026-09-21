@@ -22,6 +22,7 @@ ASSET_TYPES = {
     "index.html": "text/html",
     "teto-pattern.svg": "image/svg+xml",
     "teto-shocked.png": "image/png",
+    "teto-casino.png": "image/png",
     "og.png": "image/png",
 }
 ID_RE = re.compile(r"^[0-9]+$")
