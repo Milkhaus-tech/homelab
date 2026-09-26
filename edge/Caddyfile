@@ -64,5 +64,11 @@ ig.milkhaus.net {
 }
 
 stats.milkhaus.net {
-    reverse_proxy 10.0.0.2:8101
+    handle_path /manage/* {
+        reverse_proxy 10.0.0.2:8102
+    }
+    redir /manage /manage/ 308
+    handle {
+        reverse_proxy 10.0.0.2:8101
+    }
 }
