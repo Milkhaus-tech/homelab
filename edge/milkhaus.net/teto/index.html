@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>Teto — support &amp; status</title>
+<meta name="description" content="Teto is a Discord bot: conversation, memory and text-to-speech, free in every server. Tipping is paused while our Ko-fi page is under review.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="https://milkhaus.net/teto/">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preload" href="/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/geist-mono.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Geist";src:url("/fonts/geist.woff2") format("woff2");font-weight:300 800;font-style:normal;font-display:swap}
+@font-face{font-family:"Geist Mono";src:url("/fonts/geist-mono.woff2") format("woff2");font-weight:400 700;font-style:normal;font-display:swap}
+:root{
+  --bg:#000;--panel:#0c0c0e;--raised:#141417;
+  --line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
+  --text:#f4f4f6;--soft:#c6c7ce;--muted:#8a8b94;
+  --red:#ff2d3f;--red-deep:#a8101f;--red-glow:rgba(255,45,63,.55);
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg);scroll-behavior:smooth}
+body{margin:0;padding:0 clamp(18px,5vw,32px) 80px;background:var(--bg);font-family:var(--sans);font-size:17px;line-height:1.6;color:var(--soft);-webkit-font-smoothing:antialiased}
+main{max-width:640px;margin:0 auto}
+
+/* top bar */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 0;border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none}
+.brand img{width:22px;height:22px;display:block;border-radius:5px}
+.brand b{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.18em;color:var(--text)}
+.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+
+/* the sign */
+.sign{margin:44px 0 0;padding:clamp(26px,6vw,40px) 24px;text-align:center;border:1px solid rgba(255,45,63,.45);border-radius:14px;
+  background:linear-gradient(180deg,#160406,#0b0102);position:relative;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6) inset,0 0 40px rgba(255,45,63,.12)}
+.sign::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 90% at 50% 100%,rgba(255,45,63,.18),transparent 70%)}
+.sign-txt{position:relative;margin:0;font-size:clamp(2.1rem,9.5vw,3.6rem);font-weight:800;letter-spacing:-.02em;line-height:1;color:#fff;
+  text-shadow:0 0 12px var(--red-glow),0 0 32px var(--red-glow),0 0 70px rgba(255,45,63,.35)}
+.sign-sub{position:relative;margin:14px 0 0;font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,120,132,.9)}
+
+h1{margin:44px 0 0;font-size:clamp(1.8rem,5vw,2.4rem);font-weight:650;letter-spacing:-.03em;line-height:1.15;color:var(--text)}
+.intro{margin:14px 0 0;font-size:1.05rem;color:var(--soft)}
+
+/* sections */
+section{margin-top:52px}
+.eyebrow{margin:0 0 14px;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+h2{margin:0;font-size:1.25rem;font-weight:600;letter-spacing:-.02em;color:var(--text)}
+code{font-family:var(--mono);font-size:.9em;padding:2px 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--raised);color:var(--text);white-space:nowrap}
+a{color:var(--text);text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:3px}
+a:hover{text-decoration-color:var(--red)}
+.btns{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:13px 22px;border-radius:10px;font-size:.95rem;font-weight:600;text-decoration:none;
+  border:1px solid var(--line-2);color:var(--text);background:transparent;transition:background-color 160ms ease,border-color 160ms ease}
+.btn:hover{background:var(--raised)}
+.btn-primary{background:#f4f4f6;border-color:#f4f4f6;color:#0a0a0b}
+.btn-primary:hover{background:#fff;border-color:#fff}
+
+/* limits table */
+.limits{margin:18px 0 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.limits div{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:baseline;padding:16px 20px;border-bottom:1px solid var(--line)}
+.limits div:last-child{border-bottom:0}
+.limits dt{margin:0;color:var(--soft)}
+.limits dd{margin:0;font-family:var(--mono);font-size:.95rem;font-weight:600;color:var(--text);white-space:nowrap}
+.note{margin:12px 0 0;font-size:.93rem;color:var(--muted)}
+
+/* faq */
+.faq{margin:18px 0 0;border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;align-items:center;padding:16px 0;font-weight:600;font-size:1rem;color:var(--text)}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font-family:var(--mono);color:var(--muted);flex:none;transition:transform 160ms ease}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq .a{padding:0 0 18px;color:var(--muted);font-size:.97rem}
+.faq .a p{margin:0 0 10px}.faq .a p:last-child{margin-bottom:0}
+
+.foot{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:.92rem}
+
+:focus-visible{outline:2px solid var(--text);outline-offset:3px;border-radius:4px}
+::selection{background:rgba(255,45,63,.55);color:#fff}
+@media (min-width:600px){.sign-txt{white-space:nowrap}}
+@media (max-width:600px){body{font-size:16px}.btn{flex:1 1 auto}.limits div{padding:14px 16px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <a class="brand" href="/"><img src="/favicon.svg?v=2" alt="" width="22" height="22" aria-hidden="true"><b>MILKHAUS</b></a>
+    <span class="status">Tips paused</span>
+  </header>
+
+  <div class="sign" role="note" aria-label="Tips are paused">
+    <p class="sign-txt">TIPS ARE PAUSED</p>
+    <p class="sign-sub">The bot is still free and still running</p>
+  </div>
+
+  <h1>Teto</h1>
+  <p class="intro">A resident for your Discord server — conversation, memory, and 322 text-to-speech voices. Free in every server.</p>
+
+  <section>
+    <p class="eyebrow">Status</p>
+    <h2>Why tipping is switched off</h2>
+    <p>Our Ko-fi page was unpublished on 17 September and is under review. Until that finishes there is no way to tip, and we would rather say so than leave a button that goes nowhere.</p>
+    <p>The flag was for gambling. Teto has card and dice mini-games, and the old page leaned hard into a casino theme — the name, the artwork, the screenshots. That was our mistake in presentation, and we have rebranded it. The chips those games use are play money: handed out free by <code>/daily</code>, and they cannot be bought, sold, transferred or cashed out. There are no prizes, no payouts and no real-money wagering anywhere in the bot.</p>
+    <p>We have asked Ko-fi to take another look. Their stated turnaround is about seven days; we are not promising a date.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Meanwhile</p>
+    <h2>Nothing you use has changed</h2>
+    <dl class="limits">
+      <div><dt>AI chat</dt><dd>Free in every server</dd></div>
+      <div><dt>Free through</dt><dd>2026-12-31</dd></div>
+      <div><dt>Spend cap</dt><dd>$2/day per server</dd></div>
+      <div><dt>Mini-games and TTS</dt><dd>Always free</dd></div>
+    </dl>
+    <p class="note">That cap is roughly 500 replies a day per server. It is a ceiling, not a promised number.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">If you wanted to help</p>
+    <h2>Hold onto it for now</h2>
+    <p>There is deliberately no payment button on this page. Wiring up a second payment processor in the middle of a review is how you end up explaining two of them.</p>
+    <p>When the Ko-fi page is back, this page will point at it again. If the review goes the other way, we will set up GitHub Sponsors and say so here.</p>
+    <div class="btns">
+      <a class="btn btn-primary" href="https://discord.com/oauth2/authorize?client_id=1530833931841306847">Add Teto to your server</a>
+      <a class="btn" href="https://discord.gg/WGbcCRDJJf">Support server</a>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Also new</p>
+    <h2>Server stats</h2>
+    <p>Teto now keeps activity stats for the servers she is in: messages, voice time and members over time. In Discord, <code>/server</code> gives the overview, <code>/me</code> your own card, <code>/top</code> the rankings, and <code>/stats</code> and <code>/chart</code> the totals and graphs.</p>
+    <p>The same numbers are on the web at <a href="https://stats.milkhaus.net/">stats.milkhaus.net</a>. Log in with Discord and pick a server. A server's dashboard is visible to its admins until one of them opens it to members or the public with <code>/stats dashboard</code>.</p>
+    <div class="btns">
+      <a class="btn" href="https://stats.milkhaus.net/">Open the stats dashboard</a>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">Questions</p>
+    <h2>The short answers</h2>
+    <div class="faq">
+      <details>
+        <summary>Does this affect paid server tabs?</summary>
+        <div class="a"><p>There are none to affect. While the free promo runs to 2026-12-31 no server needs a tab, and none has one.</p></div>
+      </details>
+      <details>
+        <summary>Can I still use the mini-games?</summary>
+        <div class="a"><p>Yes. They were never switched off, and they are free in every server.</p></div>
+      </details>
+      <details>
+        <summary>Where is the source?</summary>
+        <div class="a"><p>The bot is open source at <a href="https://github.com/Milkhaus-tech/tetos-casino">github.com/Milkhaus-tech/tetos-casino</a>. The repository name predates the rebrand; we left it alone rather than quietly rename it.</p></div>
+      </details>
+      <details>
+        <summary>Is my data affected?</summary>
+        <div class="a"><p>No. Nothing about the review touches the bot or anything it stores. <code>/teto-erase-me</code> still wipes your archive and profile on request.</p></div>
+      </details>
+    </div>
+  </section>
+
+  <p class="foot">Last updated 26 September 2026 · <a href="/">milkhaus.net</a></p>
+</main>
+</body>
+</html>
