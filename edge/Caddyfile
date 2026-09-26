@@ -64,6 +64,7 @@ ig.milkhaus.net {
 }
 
 stats.milkhaus.net {
+    encode zstd gzip
     handle_path /manage/* {
         reverse_proxy 10.0.0.2:8102
     }
