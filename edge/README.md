@@ -6,6 +6,8 @@ home, so the home network exposes nothing directly. Full path + firewall model i
 
 - [`Caddyfile`](Caddyfile) — every HTTPS vhost, reverse-proxied to the box's tunnel
   address (`10.0.0.2`). Caddy manages certificates itself.
+- [`milkhaus.net/`](milkhaus.net) — tracked pages of the static root site Caddy serves from
+  `/var/www/milkhaus` on the VPS (so far only `teto/`); copy a page there to deploy it.
 - **Game traffic bypasses Caddy entirely** — iptables DNAT rules (persisted with
   `netfilter-persistent`) forward the game ports over the same tunnel. Illustrative
   rule shape:
