@@ -67,6 +67,7 @@ PY
 X 644 /opt/homeassist/docker-compose.yml services/home-assistant/docker-compose.yml \
   's#TOKEN=[A-Za-z0-9._-]+#TOKEN=${HA_MATTER_TOKEN}#'
 X 644 /opt/homeassist/config/configuration.yaml   services/home-assistant/configuration.yaml
+priv services/home-assistant/configuration.yaml
 X 644 /opt/homeassist/config/automations.yaml     services/home-assistant/automations.yaml \
   's/(webhook_id:) .*/\1 <redacted>/'
 priv services/home-assistant/automations.yaml
@@ -108,8 +109,18 @@ X 644 /opt/donetick/docker-compose.yml            services/donetick/docker-compo
 X 755 /opt/xmrig/run-safe-xmrig.sh                services/xmrig/run-safe-xmrig.sh
 X 644 /etc/systemd/system/xmrig.service           services/xmrig/xmrig.service
 
+## ---- portmap (live in ~/docker/portmap; tailnet addresses templated out) ----
+X 644 "$H/docker/portmap/docker-compose.yml"      services/portmap/docker-compose.yml
+for f in index guide; do
+  X 644 "$H/docker/portmap/html/$f.html" services/portmap/html/$f.html \
+    's/\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+\b/100.x.y.z/g' \
+    's/\btail[0-9a-f]+\.ts\.net\b/your-tailnet.ts.net/g'
+  priv services/portmap/html/$f.html
+done
+
 ## ---- host ops ----
 X 755 "$H/bin/backup-stacks.sh"                   ops/backup-stacks.sh
+priv ops/backup-stacks.sh
 X 755 "$H/bin/homelab-alerts.sh"                  ops/homelab-alerts.sh
 X 755 "$H/portwatch.sh"                           ops/portwatch.sh
 X 755 "$H/portwatch-tally.sh"                     ops/portwatch-tally.sh

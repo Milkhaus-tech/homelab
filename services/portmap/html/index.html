@@ -51,35 +51,36 @@
 <tr><td><a href="https://pz.milkhaus.net">pz.milkhaus.net</a></td><td>noahlab:8089</td><td>Project Zomboid stats</td></tr>
 <tr><td><a href="https://mc.milkhaus.net">mc.milkhaus.net</a></td><td>noahlab:8093</td><td>Minecraft stats</td></tr>
 <tr><td>node1 / jesus / pablo .milkhaus.net</td><td>each node :8090</td><td>Pterodactyl wings APIs (panel↔node)</td></tr>
-<tr><td><a href="https://noahlab.tail91d582.ts.net">noahlab.tail91d582.ts.net</a></td><td>noahlab:8091</td><td>Site via Tailscale Funnel</td></tr>
+<tr><td><a href="https://noahlab.your-tailnet.ts.net">noahlab.your-tailnet.ts.net</a></td><td>noahlab:8091</td><td>Site via Tailscale Funnel</td></tr>
 </table></section>
 
 <section style="--accent:var(--noahlab)">
-<h2>🏠 noahlab <small>192.168.1.10 · ts 100.114.185.102 · wg 10.0.0.2 — media / home / edge (16c, GTX 1660S, 13T media)</small></h2>
+<h2>🏠 noahlab <small>192.168.1.210 · ts 100.x.y.z · wg 10.0.0.2 — media / home / edge (16c, GTX 1660S, 13T media)</small></h2>
 <table><tr><th>port</th><th>service</th><th>open</th><th>notes</th></tr>
 <tr><td class="port">22</td><td>SSH</td><td></td><td class="note">alias: <kbd>ssh noahlab</kbd></td></tr>
-<tr><td class="port">1337</td><td><b>this page</b></td><td><a href="http://192.168.1.10:1337">open</a></td><td class="note">port map cheat sheet</td></tr>
-<tr><td class="port">8096</td><td>Jellyfin</td><td><a href="http://192.168.1.10:8096">open</a></td><td class="note">8920 = https; NVENC on the 1660</td></tr>
-<tr><td class="port">5055</td><td>Jellyseerr</td><td><a href="http://192.168.1.10:5055">open</a></td><td class="note">media requests</td></tr>
-<tr><td class="port">5000</td><td>Frigate <span class="tag">proxy → jesus</span></td><td><a href="http://192.168.1.10:5000">open</a></td><td class="note">TCP proxy (frigate-proxy@5000) — old links + tailscale share keep working</td></tr>
-<tr><td class="port">8554</td><td>Frigate RTSP <span class="tag">proxy → jesus</span></td><td></td><td class="note">rtsp://192.168.1.10:8554/&lt;cam&gt; still valid</td></tr>
-<tr><td class="port">8123</td><td>Home Assistant</td><td><a href="http://192.168.1.10:8123">open</a></td><td class="note">+ matter-bridge, mosquitto MQTT :1883</td></tr>
-<tr><td class="port">8989</td><td>Sonarr</td><td><a href="http://192.168.1.10:8989">open</a></td><td></td></tr>
-<tr><td class="port">7878</td><td>Radarr</td><td><a href="http://192.168.1.10:7878">open</a></td><td></td></tr>
-<tr><td class="port">6767</td><td>Bazarr</td><td><a href="http://192.168.1.10:6767">open</a></td><td class="note">subtitles</td></tr>
-<tr><td class="port">9696</td><td>Prowlarr</td><td><a href="http://192.168.1.10:9696">open</a></td><td class="note">indexers</td></tr>
-<tr><td class="port">7474</td><td>Autobrr</td><td><a href="http://192.168.1.10:7474">open</a></td><td></td></tr>
-<tr><td class="port">11011</td><td>Cleanuparr</td><td><a href="http://192.168.1.10:11011">open</a></td><td></td></tr>
-<tr><td class="port">8080</td><td>qBittorrent</td><td><a href="http://192.168.1.10:8080">open</a></td><td class="note">via gluetun VPN; peer port 48592</td></tr>
-<tr><td class="port">8087</td><td>Filebrowser</td><td><a href="http://192.168.1.10:8087">open</a></td><td></td></tr>
-<tr><td class="port">8056</td><td>jfa-go</td><td><a href="http://192.168.1.10:8056">open</a></td><td class="note">jellyfin invites</td></tr>
-<tr><td class="port">8094</td><td>Roundcube</td><td><a href="http://192.168.1.10:8094">open</a></td><td class="note">webmail</td></tr>
-<tr><td class="port">2021</td><td>Donetick</td><td><a href="http://192.168.1.10:2021">open</a></td><td class="note">chores</td></tr>
-<tr><td class="port">8089</td><td>pzstats</td><td><a href="http://192.168.1.10:8089">open</a></td><td></td></tr>
-<tr><td class="port">8093</td><td>mcstats</td><td><a href="http://192.168.1.10:8093">open</a></td><td></td></tr>
+<tr><td class="port">1337</td><td><b>this page</b></td><td><a href="http://192.168.1.210:1337">open</a></td><td class="note">port map cheat sheet</td></tr>
+<tr><td class="port">8096</td><td>Jellyfin</td><td><a href="http://192.168.1.210:8096">open</a></td><td class="note">8920 = https; NVENC on the 1660</td></tr>
+<tr><td class="port">5055</td><td>Jellyseerr</td><td><a href="http://192.168.1.210:5055">open</a></td><td class="note">media requests</td></tr>
+<tr><td class="port">5000</td><td>Frigate <span class="tag">proxy → jesus</span></td><td><a href="http://192.168.1.210:5000">open</a></td><td class="note">TCP proxy (frigate-proxy@5000) — old links + tailscale share keep working</td></tr>
+<tr><td class="port">8554</td><td>Frigate RTSP <span class="tag">proxy → jesus</span></td><td></td><td class="note">rtsp://192.168.1.210:8554/&lt;cam&gt; still valid</td></tr>
+<tr><td class="port">8123</td><td>Home Assistant</td><td><a href="http://192.168.1.210:8123">open</a></td><td class="note">+ matter-bridge, mosquitto MQTT :1883</td></tr>
+<tr><td class="port">8989</td><td>Sonarr</td><td><a href="http://192.168.1.210:8989">open</a></td><td></td></tr>
+<tr><td class="port">7878</td><td>Radarr</td><td><a href="http://192.168.1.210:7878">open</a></td><td></td></tr>
+<tr><td class="port">6767</td><td>Bazarr</td><td><a href="http://192.168.1.210:6767">open</a></td><td class="note">subtitles</td></tr>
+<tr><td class="port">9696</td><td>Prowlarr</td><td><a href="http://192.168.1.210:9696">open</a></td><td class="note">indexers</td></tr>
+<tr><td class="port">7474</td><td>Autobrr</td><td><a href="http://192.168.1.210:7474">open</a></td><td></td></tr>
+<tr><td class="port">11011</td><td>Cleanuparr</td><td><a href="http://192.168.1.210:11011">open</a></td><td></td></tr>
+<tr><td class="port">8080</td><td>qBittorrent</td><td><a href="http://192.168.1.210:8080">open</a></td><td class="note">via gluetun VPN; peer port 48592</td></tr>
+<tr><td class="port">8087</td><td>Filebrowser</td><td><a href="http://192.168.1.210:8087">open</a></td><td></td></tr>
+<tr><td class="port">8056</td><td>jfa-go</td><td><a href="http://192.168.1.210:8056">open</a></td><td class="note">jellyfin invites</td></tr>
+<tr><td class="port">8094</td><td>Roundcube</td><td><a href="http://192.168.1.210:8094">open</a></td><td class="note">webmail</td></tr>
+<tr><td class="port">2021</td><td>Donetick</td><td><a href="http://192.168.1.210:2021">open</a></td><td class="note">chores</td></tr>
+<tr><td class="port">8089</td><td>pzstats</td><td><a href="http://192.168.1.210:8089">open</a></td><td></td></tr>
+<tr><td class="port">8093</td><td>mcstats</td><td><a href="http://192.168.1.210:8093">open</a></td><td></td></tr>
 <tr><td class="port">8090</td><td>Wings API <span class="tag int">panel-only</span></td><td></td><td class="note">node1.milkhaus.net; runs the Factorio server</td></tr>
 <tr><td class="port">8091</td><td>Site backend <span class="tag int">localhost</span></td><td></td><td class="note">milkhaus bot web; funnel + caddy front it</td></tr>
 <tr><td class="port">8092</td><td>teto-private <span class="tag int">localhost</span></td><td></td><td></td></tr>
+<tr><td class="port">8097</td><td>teto costs</td><td><a href="http://192.168.1.210:8097">open</a></td><td class="note">API spend, both bots; ?from=&amp;to= for a range</td></tr>
 <tr><td class="port">47989</td><td>Sunshine (main :0 desktop)</td><td></td><td class="note">Moonlight to noahlab's real desktop; web UI :47990</td></tr>
 <tr><td class="port">9222</td><td>vd-browser CDP <span class="tag int">localhost</span></td><td></td><td class="note">agent browser, capped 16G/no-swap; <kbd>vd-browser</kbd> to launch</td></tr>
 <tr><td class="port">9100</td><td>node_exporter</td><td></td><td class="note">metrics</td></tr>
@@ -89,17 +90,17 @@
 </table></section>
 
 <section style="--accent:var(--jesus)">
-<h2>⚙️ jesus <small>192.168.1.11 · ts 100.73.215.90 · wg 10.0.0.3 — compute workhorse (24c, GTX 970)</small></h2>
+<h2>⚙️ jesus <small>192.168.1.211 · ts 100.x.y.z · wg 10.0.0.3 — compute workhorse (24c, GTX 970)</small></h2>
 <table><tr><th>port</th><th>service</th><th>open</th><th>notes</th></tr>
 <tr><td class="port">22</td><td>SSH</td><td></td><td class="note"><kbd>ssh jesus</kbd></td></tr>
-<tr><td class="port">5000</td><td>Frigate UI</td><td><a href="http://192.168.1.11:5000">open</a></td><td class="note">9 Tapo cams; recordings → NFS → noahlab media drive</td></tr>
-<tr><td class="port">8554</td><td>Frigate RTSP (go2rtc)</td><td></td><td class="note">rtsp://192.168.1.11:8554/&lt;cam&gt;; 8555 = WebRTC; 1984 = go2rtc API</td></tr>
-<tr><td class="port">3000</td><td>Grafana</td><td><a href="http://192.168.1.11:3000">open</a></td><td class="note">dashboards (Teto skin)</td></tr>
-<tr><td class="port">9090</td><td>Prometheus</td><td><a href="http://192.168.1.11:9090">open</a></td><td class="note">scrapes all nodes</td></tr>
-<tr><td class="port">4221</td><td>Audible UI</td><td><a href="http://192.168.1.11:4221">open</a></td><td class="note">fantasy football assistant</td></tr>
+<tr><td class="port">5000</td><td>Frigate UI</td><td><a href="http://192.168.1.211:5000">open</a></td><td class="note">9 Tapo cams; recordings → NFS → noahlab media drive</td></tr>
+<tr><td class="port">8554</td><td>Frigate RTSP (go2rtc)</td><td></td><td class="note">rtsp://192.168.1.211:8554/&lt;cam&gt;; 8555 = WebRTC; 1984 = go2rtc API</td></tr>
+<tr><td class="port">3000</td><td>Grafana</td><td><a href="http://192.168.1.211:3000">open</a></td><td class="note">dashboards (Teto skin)</td></tr>
+<tr><td class="port">9090</td><td>Prometheus</td><td><a href="http://192.168.1.211:9090">open</a></td><td class="note">scrapes all nodes</td></tr>
+<tr><td class="port">4221</td><td>Audible UI</td><td><a href="http://192.168.1.211:4221">open</a></td><td class="note">fantasy football assistant</td></tr>
 <tr><td class="port">8888</td><td>Audible backend <span class="tag int">api</span></td><td></td><td class="note">FastAPI; /api proxied via :4221</td></tr>
 <tr><td class="port">8877</td><td>LLM bridge <span class="tag int">compose-gw</span></td><td></td><td class="note">claude CLI bridge, 172.19.0.1 only</td></tr>
-<tr><td class="port">8081</td><td>Pterodactyl panel</td><td><a href="http://192.168.1.11:8081">open</a></td><td class="note">= panel.milkhaus.net</td></tr>
+<tr><td class="port">8081</td><td>Pterodactyl panel</td><td><a href="http://192.168.1.211:8081">open</a></td><td class="note">= panel.milkhaus.net</td></tr>
 <tr><td class="port">8090</td><td>Wings API <span class="tag int">panel-only</span></td><td></td><td class="note">jesus.milkhaus.net; runs Project Zomboid</td></tr>
 <tr><td class="port">48989</td><td>Moonlight: standard</td><td></td><td class="note">Audible desktop :11 · CDP 9311 · web :48990</td></tr>
 <tr><td class="port">49989</td><td>Moonlight: warroom</td><td></td><td class="note">draft-day desktop :12 · CDP 9312 · web :49990</td></tr>
@@ -110,7 +111,7 @@
 </table></section>
 
 <section style="--accent:var(--pablo)">
-<h2>🎮 pablo <small>192.168.1.12 · ts 100.78.60.27 · wg 10.0.0.4 — game node (12c, RX 550, headless)</small></h2>
+<h2>🎮 pablo <small>192.168.1.212 · ts 100.x.y.z · wg 10.0.0.4 — game node (12c, RX 550, headless)</small></h2>
 <table><tr><th>port</th><th>service</th><th>open</th><th>notes</th></tr>
 <tr><td class="port">22</td><td>SSH</td><td></td><td class="note"><kbd>ssh pablo</kbd></td></tr>
 <tr><td class="port">8090</td><td>Wings API <span class="tag int">panel-only</span></td><td></td><td class="note">pablo.milkhaus.net; runs the Java/Minecraft server</td></tr>
@@ -118,14 +119,14 @@
 </table></section>
 
 <section style="--accent:var(--vultr)">
-<h2>☁️ vultr <small>45.32.87.10 · wg 10.0.0.1 — public edge</small></h2>
+<h2>☁️ vultr <small>vps.example.net · wg 10.0.0.1 — public edge</small></h2>
 <table><tr><th>port</th><th>service</th><th>notes</th></tr>
 <tr><td class="port">22</td><td>SSH (root)</td><td class="note"><kbd>ssh vultr</kbd> (ProxyJump via noahlab)</td></tr>
 <tr><td class="port">80/443</td><td>Caddy</td><td class="note">terminates TLS for every *.milkhaus.net above, behind Cloudflare</td></tr>
 </table></section>
 
 <section style="--accent:var(--desktop)">
-<h2>🖥️ noah-desktop <small>192.168.1.13 — main rig</small></h2>
+<h2>🖥️ noah-desktop <small>192.168.1.213 — main rig</small></h2>
 <table><tr><th>port</th><th>service</th><th>notes</th></tr>
 <tr><td class="port">47989</td><td>Sunshine (main)</td><td class="note">+ second instance for DP-1; Moonlight targets</td></tr>
 <tr><td class="port">9100</td><td>node_exporter</td><td class="note">scraped by jesus prometheus</td></tr>
@@ -138,7 +139,7 @@
 <tr><td class="note"><kbd>vd-desktop status</kbd> (jesus)</td><td class="note">which virtual desktops are up</td></tr>
 <tr><td class="note">Game server ports</td><td class="note">allocated per-server in the <a href="https://panel.milkhaus.net">panel</a> — Factorio→noahlab, PZ→jesus, MC→pablo</td></tr>
 <tr><td class="note">Moonlight logins</td><td class="note">the usual milk login; devices paired to the main desktop work on every vd desktop PIN-free</td></tr>
-<tr><td class="note">MQTT</td><td class="note">mosquitto @ 192.168.1.10:1883 (frigate + HA talk through it)</td></tr>
+<tr><td class="note">MQTT</td><td class="note">mosquitto @ 192.168.1.210:1883 (frigate + HA talk through it)</td></tr>
 </table></section>
 
 <footer>Maintained by Claude · sources: live configs on all nodes + vultr Caddyfile · no secrets on this page</footer>

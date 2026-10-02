@@ -8,10 +8,6 @@
 # this machine's public IP, then replace ":80" below with your
 # domain name.
 
-stream.milkhaus.net {
-	reverse_proxy 10.0.0.2:8096
-}
-
 request.milkhaus.net {
     reverse_proxy 10.0.0.2:5055
 }
@@ -21,7 +17,7 @@ join.milkhaus.net {
 }
 
 panel.milkhaus.net {
-    reverse_proxy 10.0.0.2:8081 {
+    reverse_proxy 10.0.0.3:8081 {
         header_up Host {host}
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
@@ -30,6 +26,14 @@ panel.milkhaus.net {
 }
 node1.milkhaus.net {
     reverse_proxy 10.0.0.2:8090
+}
+
+jesus.milkhaus.net {
+    reverse_proxy 10.0.0.3:8090
+}
+
+pablo.milkhaus.net {
+    reverse_proxy 10.0.0.4:8090
 }
 
 files.milkhaus.net {
@@ -55,12 +59,63 @@ files.milkhaus.net {
 milkhaus.net {
 	root * /var/www/milkhaus
 	encode zstd gzip
-	try_files {path} /index.html
 	file_server
+	# try_files used to fall back to /index.html, which answered every typo URL
+	# with 200 + the homepage. Real 404s now, so search engines stop indexing them.
+	handle_errors {
+		rewrite * /{err.status_code}.html
+		file_server {
+			status {err.status_code}
+		}
+	}
+}
+
+pz.milkhaus.net {
+    reverse_proxy 10.0.0.2:8089
+}
+
+mc.milkhaus.net {
+    reverse_proxy 10.0.0.2:8093
+}
+
+www.milkhaus.net {
+    redir https://milkhaus.net{uri} permanent
+}
+
+davidsonstechservices.com {
+	root * /var/www/davidsonstech
+	encode zstd gzip
+	try_files {path} {path}/ /index.html
+	file_server
+}
+
+www.davidsonstechservices.com {
+	redir https://davidsonstechservices.com{uri} permanent
 }
 
 ig.milkhaus.net {
     reverse_proxy 10.0.0.2:8095
+}
+
+test.milkhaus.net {
+	root * /var/www/test
+	encode zstd gzip
+	header X-Robots-Tag "noindex, nofollow"
+	file_server
+}
+
+x.milkhaus.net {
+    reverse_proxy 10.0.0.2:8099
+}
+
+stevedavisphoto.com {
+	root * /var/www/stevedavisphoto
+	encode zstd gzip
+	file_server
+}
+
+www.stevedavisphoto.com {
+	redir https://stevedavisphoto.com{uri} permanent
 }
 
 stats.milkhaus.net {
@@ -72,4 +127,17 @@ stats.milkhaus.net {
     handle {
         reverse_proxy 10.0.0.2:8101
     }
+}
+
+goodnod.milkhaus.net {
+	encode zstd gzip
+	reverse_proxy 10.0.0.2:8103 {
+		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+	}
+}
+
+mundusnet.milkhaus.net {
+	root * /var/www/mundusnet
+	encode zstd gzip
+	file_server
 }

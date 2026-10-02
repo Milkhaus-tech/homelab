@@ -63,7 +63,8 @@ for f in ["/opt/homeassist/config/secrets.yaml", "/etc/pterodactyl/config.yml",
           "/home/noah/docker/qbittorrentvpn/config/recyclarr/secrets.yml"]:
     for line in read(f).splitlines():
         m = secretkey.match(line)
-        if m:
+        # Home Assistant ships "some_password: welcome" as its example secret
+        if m and (m.group(1), m.group(3).strip()) != ("some_password", "welcome"):
             add(f"{f}:{m.group(1)}", m.group(3))
 
 # mosquitto password hashes
