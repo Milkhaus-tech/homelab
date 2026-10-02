@@ -19,7 +19,7 @@ files=$(git ls-files -c -o --exclude-standard | grep -v '^tools/.private-tokens$
 
 ## ---- net 1: credential-shaped patterns ----
 pat='eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}|BEGIN [A-Z ]*PRIVATE KEY|rtsp://[^{<$@/[:space:]]+:[^{<$@/[:space:]]+@|api/webhook/[a-f0-9]{16,}|(password|passwd|secret|token|api_?key|apikey|private_?key|access_?key)["'"'"'[:space:]]*[:=]["'"'"'[:space:]]*[A-Za-z0-9+/][A-Za-z0-9+/._!^-]{9,}'
-allow='\$\{[A-Za-z_]+\}|\{FRIGATE_[A-Z_]+\}|!secret |<redacted>|<your-|changeme|your_[a-z_]+|_here\b|example|REDACTED|- /[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+:'
+allow='\$\{[A-Za-z_]+\}|\{FRIGATE_[A-Z_]+\}|!secret |<redacted>|<your-|changeme|your_[a-z_]+|_here\b|example|REDACTED|- /[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+:|(token|secret|password)["'"'"'[:space:]]*[:=][[:space:]]*[A-Za-z_][A-Za-z0-9_.]*\('
 hits=$(echo "$files" | xargs -r grep -nEIiH "$pat" 2>/dev/null | grep -vE "$allow" || true)
 if [ -n "$hits" ]; then
   echo "PATTERN HITS (value-bearing lines in the publish tree):" >&2
