@@ -2,128 +2,116 @@
 
 [![CI](https://github.com/Milkhaus-tech/homelab/actions/workflows/ci.yml/badge.svg)](https://github.com/Milkhaus-tech/homelab/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Ubuntu 24.04](https://img.shields.io/badge/Ubuntu-24.04_LTS-E95420?logo=ubuntu&logoColor=white)
-![Docker](https://img.shields.io/badge/containers-~40-2496ED?logo=docker&logoColor=white)
 
-A one-person homelab that behaves like a small platform. Everything runs on a single
-machine: a fully automated media pipeline, dedicated game servers behind a management
-panel, a nine-camera AI NVR, whole-house automation, Prometheus/Grafana observability,
-nightly off-disk backups — and a headless virtual desktop streamed to a phone, built so
-both a human and AI agents can drive a real browser on the box.
+This is everything I run at home. Three machines in my house and one small VPS, hosting
+game servers for my friends, a movie site, my Discord bots, cameras, and a lot of
+automation for the house. It started because I just wanted a personal stream thing and
+kinda got out of hand lol.
 
-This repo is the **live configuration**, exported and sanitized by
-[`tools/sync-from-live.sh`](tools/): every compose file, config, script, and systemd unit
-here is what actually runs, with credentials templated out and a
-[two-net leak verifier](tools/verify-no-leaks.sh) + CI secret scanning standing between
-the lab and this page. The public face is **[milkhaus.net](https://milkhaus.net)**.
+Every compose file, config and script in here is the real one that's running right now.
+The only difference is the passwords got pulled out on the way. The public side of all
+this is **[milkhaus.net](https://milkhaus.net)**.
 
-## Architecture
+## How it's wired
 
 ```mermaid
 flowchart TB
-    web["Web clients"] -->|"HTTPS 443"| caddy
+    web["Web"] -->|HTTPS| cf["Cloudflare"]
     game["Game clients"] -->|"game UDP / TCP"| dnat
-    phone["Moonlight / admin"] -->|Tailscale| lab
+    me["Me, from anywhere"] -->|Tailscale| home
+
+    cf --> caddy
+    cf -->|"tunnel (Jellyfin)"| noahlab
 
     subgraph vps["Edge VPS"]
-        caddy["Caddy · TLS termination"]
+        caddy["Caddy + TLS"]
         dnat["iptables DNAT"]
     end
 
-    caddy -->|"WireGuard tunnel"| lab
-    dnat -->|"WireGuard tunnel"| lab
+    caddy -->|WireGuard| home
+    dnat -->|WireGuard| home
 
-    subgraph lab["noahlab · Ryzen 7 2700X · GTX 1660 SUPER · 32 GB · Ubuntu 24.04"]
-        media["Media pipeline<br/>13 services behind a VPN namespace"]
-        jelly["Jellyfin<br/>NVENC transcode + 84-ch live TV"]
-        nvr["Frigate NVR<br/>9 cameras · YOLOX on TensorRT"]
-        ha["Home Assistant<br/>MQTT · Matter · presence HVAC"]
-        games["Pterodactyl panel + Wings<br/>Zomboid · Factorio · Minecraft"]
-        mon["Prometheus + Grafana<br/>dashboards as code"]
-        vd["Virtual desktop<br/>headless X · Sunshine · agent browser"]
+    subgraph home["Home · no open ports"]
+        noahlab["noahlab<br/>media, Jellyfin, Home Assistant,<br/>Discord bots, Factorio"]
+        jesus["jesus<br/>game panel, cameras,<br/>monitoring, Zomboid"]
+        pablo["pablo<br/>Minecraft"]
     end
 ```
 
-Three tunnels coexist and never mix: the **edge WireGuard** carries public traffic home,
-**gluetun's WireGuard** exists only inside the torrent container's network namespace, and
-**Tailscale** is the admin plane. Nothing on the home network is directly exposed —
-detail in [docs/architecture.md](docs/architecture.md).
+My router forwards zero ports. Web traffic comes in through Caddy on the VPS or a
+Cloudflare tunnel, game traffic gets DNAT'd on the VPS and rides WireGuard home, and
+I get in over Tailscale. The torrent client has its own VPN that only exists inside its
+container, so it can't leak onto anything else. More in
+[docs/architecture.md](docs/architecture.md).
 
-## Hardware
+## The boxes
 
-| | |
+| | Hardware | What it does |
+|---|---|---|
+| **noahlab** | Ryzen 7 2700X · GTX 1660 SUPER · 32 GB · 14 TB media drive + 1 TB backup SSD | Media pipeline, Jellyfin with GPU transcoding, Home Assistant, the Discord bots, Factorio |
+| **jesus** | Ryzen 9 3900X · GTX 970 · 32 GB | Pterodactyl panel, Frigate on nine cameras, Prometheus + Grafana, Zomboid |
+| **pablo** | Ryzen 5 5600X · RX 560 · 16 GB | Minecraft (Java + Bedrock) |
+| **VPS** | 1 vCPU | Caddy, game port forwarding, the static sites |
+
+All of it is Docker on Ubuntu.
+
+## What's in here
+
+| Folder | What it is |
 |---|---|
-| CPU | AMD Ryzen 7 2700X (8c/16t) — cores 12–15 pinned to game servers |
-| GPU | NVIDIA GTX 1660 SUPER 6 GB — NVENC/NVDEC transcode, TensorRT detection, headless X |
-| RAM | 32 GB |
-| Storage | 1 TB NVMe (system) · 14 TB HDD (media pool, hardlink-friendly single fs) · 1 TB SSD (dedicated backup mirror) |
-| OS | Ubuntu 24.04 LTS, headless — no monitor has ever been attached |
+| [`services/media`](services/media/) | qBittorrent behind gluetun, Sonarr/Radarr/Prowlarr, Jellyseerr, Bazarr, Recyclarr, autobrr, cross-seed, plus a couple of small Python scripts that handle seeding rules and dupes |
+| [`services/jellyfin`](services/jellyfin/) | Jellyfin pinned to a version that works, NVENC tuning, and 84 free live TV channels with a guide |
+| [`services/frigate`](services/frigate/) | Nine cameras, object detection on the GPU, a week of recording, PTZ controls in Home Assistant |
+| [`services/home-assistant`](services/home-assistant/) | Presence-based HVAC and lights, doorbell snapshots, chore reminders, Matter bridge, Mosquitto |
+| [`services/monitoring`](services/monitoring/) | Prometheus + Grafana. The dashboards are built from Python so changes show up as a diff |
+| [`services/pterodactyl`](services/pterodactyl/) | The game panel, plus the stuff that keeps Factorio updated and the docker network from disappearing |
+| [`services/pzstats`](services/pzstats/) | The live stats page at [pz.milkhaus.net](https://pz.milkhaus.net), built from the server logs |
+| [`services/igembed`](services/igembed/) · [`services/xembed`](services/xembed/) | Instagram and X link fixers so posts actually preview in Discord |
+| [`services/portmap`](services/portmap/) | A little site that maps every port and box in the lab |
+| [`services/donetick`](services/donetick/) | Chore chart that pushes to phones through Home Assistant |
+| [`services/filebrowser`](services/filebrowser/) | Web file manager for the media drive |
+| [`services/xmrig`](services/xmrig/) | Idle-time miner with a thermal watchdog so it backs off when it gets hot |
+| [`virtual-desktop/`](virtual-desktop/) | A headless desktop on the GPU I can stream to my phone with Moonlight, with a browser that stays logged in |
+| [`edge/`](edge/) | The VPS side: Caddy and the game port forwarding |
+| [`ops/`](ops/) | Nightly backups to a second drive, and alerts that hit my phone when something's off |
+| [`tools/`](tools/) | The scripts that keep this repo safe to be public |
 
-## What runs here
+## Stuff I learned the hard way
 
-| Stack | Role |
-|---|---|
-| [`services/media`](services/media/) | Acquisition pipeline: qBittorrent inside a gluetun VPN namespace, Sonarr/Radarr/Prowlarr, Jellyseerr requests, Bazarr subtitles, Recyclarr TRaSH sync, autobrr race automation, cross-seed, unpackerr, cleanuparr + two custom policy engines |
-| [`services/jellyfin`](services/jellyfin/) | Streaming: pinned-version Jellyfin, NVENC/NVDEC tuning, plugin stack, curated 84-channel free live TV with EPG |
-| [`services/frigate`](services/frigate/) | NVR: 9 cameras, GPU object detection, 7-day continuous recording, PTZ control surfaced into Home Assistant |
-| [`services/home-assistant`](services/home-assistant/) | Automation: presence-driven HVAC with self-healing pollers, irrigation with a failsafe, doorbell capture, chore notifications, Matter bridge, Mosquitto |
-| [`services/monitoring`](services/monitoring/) | Prometheus scraping 8 target groups + Grafana with both dashboards built from Python (versioned, reproducible) |
-| [`services/pterodactyl`](services/pterodactyl/) | Game hosting: panel + native Wings, Project Zomboid / Factorio / Minecraft, self-healing docker network, unattended Factorio updates |
-| [`services/pzstats`](services/pzstats/) | Public live stats page for the Zomboid server, generated from server logs + A2S queries |
-| [`services/donetick`](services/donetick/) | Chore chart with webhook → Home Assistant → phone push relay |
-| [`services/filebrowser`](services/filebrowser/) | Web file manager over the media pool |
-| [`services/xmrig`](services/xmrig/) | Idle-time CPU miner wrapped in a thermal watchdog |
-| [`virtual-desktop/`](virtual-desktop/) | Headless GPU desktop streamed via Sunshine/Moonlight, persistent agent-drivable browser, evdev→XTEST input bridge, on-demand "war room" desktops |
-| [`edge/`](edge/) | The VPS side: Caddy vhosts and the game-traffic DNAT path |
-| [`ops/`](ops/) | Nightly backups, hourly health alerts to a phone, traffic dashboards |
-| [`tools/`](tools/) | The publishing pipeline that keeps this repo safe to be public |
+Nothing works how you think it does, I promise. Most of what's in here exists because
+something broke first:
 
-## The interesting parts
+- a `docker system prune` deleted a game server's network, so now a timer puts it back
+- the VPN health check restarted the tunnel 579 times in one night
+- Jellyfin generating trickplay images starved the game servers. Pinning cores fixed it:
+  frame overruns went from 22 to 2 per five minutes and load went from 20.7 to 4.9
+- six idle Chromiums plus everything else ran the box out of memory and the OOM killer
+  took out three browsers at once
+- the nightly backup was quietly skipping the files that actually mattered
 
-- **Incident-driven design.** Most of the sharp edges here were cut by a real outage
-  first: a `docker system prune` that deleted a game network (now self-healed by a
-  watchdog timer), a VPN health-check loop that restarted the tunnel 579 times in one
-  night, a torrent queue policy that silently generated tracker hit-and-runs, an OOM
-  kill that took three browsers down at once. Write-ups: [docs/incidents.md](docs/incidents.md).
-- **Policy as small programs.** Seeding rules, duplicate cleanup, and race reclamation
-  are ~150-line Python scripts with embedded self-tests, not settings scattered across
-  UIs: [`race-reaper.py`](services/media/scripts/race-reaper.py),
-  [`media-dedup.py`](services/media/scripts/media-dedup.py),
-  [`livetv-curate.py`](services/jellyfin/scripts/livetv-curate.py).
-- **Dashboards as code.** Both Grafana home dashboards are generated by Python builders
-  and POSTed to the API — the diff of a dashboard change is a code review, not a
-  screenshot: [`services/monitoring/dashboards/`](services/monitoring/dashboards/).
-- **An agent-operable machine.** The virtual desktop exposes a persistent, logged-in
-  Chromium over localhost CDP; AI agents drive it through the same instance a human
-  streams from a phone. A needs-attention convention (`vd-flag`) pushes to the phone
-  when an agent hits a login wall: [`virtual-desktop/`](virtual-desktop/).
-- **Measured, not vibed.** CPU pinning and codec tuning were done against numbers —
-  game-server frame overruns went from 22 to 2 per five minutes, system load from 20.7
-  to 4.9 — with the method documented: [docs/incidents.md](docs/incidents.md#3-jellyfin-trickplay-starves-the-game-servers).
+Full write-ups are in [docs/incidents.md](docs/incidents.md).
 
-## How this repo stays publishable
+## Keeping my passwords out of this
 
-Live configs contain real credentials; this repo must not. The export pipeline:
+The live configs have real credentials in them, so nothing gets copied here by hand:
 
-1. [`tools/sync-from-live.sh`](tools/sync-from-live.sh) copies every published file from
-   the live tree and applies **pattern-based** redaction (never literal secrets) —
-   inline values become `${VAR}` / `{FRIGATE_*}` templates with `.env.example` files.
-2. [`tools/verify-no-leaks.sh`](tools/verify-no-leaks.sh) then proves the tree clean two
-   ways: a credential-shape pattern sweep, and a value sweep that harvests the *actual*
-   secrets from the live stores and asserts none appear in any published file. A failed
-   verify fails the sync.
-3. CI re-runs the pattern sweep plus [gitleaks](https://github.com/gitleaks/gitleaks) on
-   every push, validates every compose file, and runs the scripts' self-tests.
+1. [`tools/sync-from-live.sh`](tools/sync-from-live.sh) copies the live files over and
+   swaps secrets for `${VAR}` placeholders, with `.env.example` files next to them.
+2. [`tools/verify-no-leaks.sh`](tools/verify-no-leaks.sh) checks the result two ways. One
+   pass looks for anything shaped like a credential. The other pulls my actual secrets
+   from the live machines and makes sure none of them show up anywhere in the repo. If
+   either one finds something, the sync fails.
+3. CI runs the pattern check again plus [gitleaks](https://github.com/gitleaks/gitleaks)
+   on every push, validates every compose file, and runs the scripts' tests.
 
 ## Related
 
-- **[milkhaus.net](https://milkhaus.net)** — the lab's front door and portfolio.
-- **Teto's Casino** — a Discord resident with long-term memory and a six-game casino
-  (private; described on the site).
-- **Audible** — an ESPN fantasy-football assistant with confidence-scored automation
-  (private; its draft-day browser infrastructure is the [`virtual-desktop/`](virtual-desktop/) layer).
+- **[milkhaus.net](https://milkhaus.net)** has everything that's running and how to get in.
+- **[Milkcat Nexus](https://discord.gg/b9fhFHp8FJ)** is the Discord for help, whitelists
+  and media invites.
+- **Teto** is my Discord bot. It's private, but it's on the site.
 
 ## License
 
-[MIT](LICENSE) — configs and scripts are free to steal; the point of publishing a
-homelab is that someone else gets to skip a 3 a.m. debugging session.
+[MIT](LICENSE). Take whatever you want. If it saves you a 3am debugging session, that's
+the whole point.
