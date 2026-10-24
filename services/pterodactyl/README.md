@@ -8,8 +8,7 @@ The game servers for my friends: Factorio, Project Zomboid and Minecraft.
 ## How it works
 
 - **The panel** is this compose file (panel + MariaDB + Redis) on jesus, port 8081,
-  behind Caddy. Its real secrets live in a panel-managed `var/.env` that never gets
-  committed. My theme is three files mounted over the stock ones.
+  behind Caddy. Its secrets live in a panel-managed `var/.env` that never gets committed.
 - **Wings**, Pterodactyl's agent, runs natively on all three boxes and starts each game
   in its own container. The panel reaches each one through Caddy at `node1.`, `jesus.`
   and `pablo.milkhaus.net`.
@@ -22,9 +21,9 @@ Factorio won't let you join a server on a different version, so
 [`factorio-autoupdate`](factorio-autoupdate) checks factorio.com every day at 06:00.
 When there's a new stable release it stops the server with `/quit` so the world saves,
 snapshots `saves/` with hard links, reinstalls, and only deletes the snapshot once the
-new version is hosting. Every step gets checked against the server's real state,
-because Wings answers "queued", not "done". It messages me if anything fails, and never
-starts a server I stopped myself.
+new version is hosting. Every step is checked against the server's real state, since
+Wings answers "queued", not "done". It messages me if anything fails, and never starts a
+server I stopped myself.
 
 ## Minecraft versions
 
@@ -42,8 +41,7 @@ starts a server I stopped myself.
   network is missing. It's only on noahlab so far
   ([what happened](../../docs/incidents.md#a-docker-prune-broke-every-game-server)).
 - A 502 in the panel logs usually means the WireGuard tunnel is down, not Wings.
-- Backups: the panel keeps three per server on each box, and the nightly
-  [backup](../../ops/) copies the panel database and every world to noahlab.
+- Backups: see [ops](../../ops/).
 
 ## Files
 

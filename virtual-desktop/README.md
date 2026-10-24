@@ -19,8 +19,8 @@ and I clear it from my phone.
   exists around a live draft (a draft can't be redone), one for timed store drops, and a
   scratch one ([why not one per league](../docs/incidents.md#too-many-browsers-ran-noahlab-out-of-memory)).
 - **Input for the extra desktops.** Virtual screens have no input of their own.
-  [`bin/vd-input-bridge`](bin/vd-input-bridge) grabs the keyboard, mouse and touch
-  devices each stream creates and replays them into the right screen.
+  [`bin/vd-input-bridge`](bin/vd-input-bridge) grabs the keyboard and mouse devices each
+  stream creates and replays them into the right screen.
   [`bin/vd-pair-sync`](bin/vd-pair-sync) copies my phone's pairing to every Sunshine, so I
   only type a PIN once.
 - **Asking for help.** A stuck script runs `vd-flag "what it needs"`

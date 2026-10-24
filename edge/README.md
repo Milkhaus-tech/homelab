@@ -3,7 +3,7 @@
 The VPS side of the lab. HTTPS ends here and rides WireGuard home, so my home network
 doesn't expose anything directly.
 
-**Runs on:** the VPS ([the boxes](../README.md#the-boxes)) · **Reachable at:** every public `*.milkhaus.net` site and the game ports
+**Runs on:** the VPS ([the boxes](../README.md#the-boxes)) · **Reachable at:** every public site except the two on the Cloudflare tunnel ([see architecture](../docs/architecture.md#websites)), plus the game ports
 
 - [`Caddyfile`](Caddyfile) is every HTTPS site. Each one proxies over WireGuard to the
   box that runs it (`10.0.0.2` noahlab, `.3` jesus, `.4` pablo), or serves a static site

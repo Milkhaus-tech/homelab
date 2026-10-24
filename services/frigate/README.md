@@ -30,6 +30,7 @@ object detection.
   fills those in from the container's environment ([`.env.example`](.env.example)).
   The live file has them inline, and the sync script swaps them out when it copies it
   here.
+- Live view over WebRTC goes through go2rtc on port 8555 (TCP and UDP).
 - Frigate is pinned away from the CPU threads the Zomboid server uses
   ([how](../../docs/architecture.md#keeping-games-smooth)).
 

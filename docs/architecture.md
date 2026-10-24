@@ -82,7 +82,7 @@ Game traffic never touches Caddy. It's plain `iptables` DNAT on the VPS, saved w
 
 Things I learned the hard way here:
 
-1. **The VPS provider has its own cloud firewall** in front of the box, and packets it
+1. **The VPS provider has its own cloud firewall** in front of the VPS, and packets it
    drops never even show up in `tcpdump`. A new game port needs a rule there and a DNAT
    rule on the VPS. Test from a network that isn't yours.
 2. **Game subdomains have to be grey cloud (DNS only).** Cloudflare's proxy only does
@@ -119,12 +119,12 @@ node, so the stats scripts didn't have to change.
 
 ## Exposure
 
-| Ring | Examples | Reachable from |
+| Ring | Examples | How it's exposed |
 |---|---|---|
 | Public | Jellyfin, Jellyseerr, panel, invites, files, status pages, link fixers, stats | Internet, through the VPS or the tunnel. Media accounts are invite-only. |
 | Game | Zomboid, Factorio, Minecraft (whitelisted) | Internet, through VPS DNAT |
 | Admin | Grafana, Prometheus, the *arr apps (Sonarr, Radarr and friends), qBittorrent, Frigate, Home Assistant, Sunshine | Not published anywhere public. I use them over Tailscale or the LAN. |
-| Localhost only | Chromium's debug ports, the bots' manage APIs | The box itself. The debug port gives full control of a logged-in browser, so it never leaves the machine. |
+| Localhost only | Chromium's debug ports, the bots' manage APIs | Only the machine it runs on. The debug port gives full control of a logged-in browser, so it never leaves the machine. |
 
 ## Keeping games smooth
 

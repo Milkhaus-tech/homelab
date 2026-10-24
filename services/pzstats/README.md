@@ -6,18 +6,30 @@ real-world playtime, skills, and world size. It's nginx serving a static page pl
 
 **Runs on:** noahlab, reading the game server's logs from jesus over NFS ([the boxes](../../README.md#the-boxes)) · **Reachable at:** [pz.milkhaus.net](https://pz.milkhaus.net)
 
+## How it works
+
 [`generate.py`](generate.py) merges three sources:
 
-- **A2S query** against the game port — is the server up, who is on right now
-  (Zomboid answers Source queries on its *game* port, not the second UDP port).
-- **PerkLog** — per-character hours survived and skill levels.
-- **join/leave logs** — paired into sessions for real-world playtime; an unmatched
-  join still counts up to the last event seen, so a crash never silently shortens
-  someone's number.
+- **An A2S query** (the Steam server query) against the game port: is the server up, and
+  who's on right now. Zomboid answers it on the *game* port, not the second UDP port.
+- **PerkLog:** hours survived and skill levels for each character.
+- **Join and leave logs,** paired into sessions for real-world playtime. A join with no
+  matching leave still counts up to the last event seen, so a crash doesn't shorten
+  anyone's number.
 
-Logs older than the current world's epoch are ignored — they describe a map that no
-longer exists. The page deliberately publishes **no Steam IDs and no chat contents**;
-it's reachable by anyone with the URL. Output is written atomically so the web server
-never reads a half-written file.
+## Worth knowing
 
-The page art isn't redistributed in this repo (`www/` ships the HTML only).
+- Logs from before the current world started are ignored, since they describe a map
+  that's gone.
+- The page shows no Steam IDs and no chat, because anyone with the link can see it.
+- Output is written atomically, so nginx never serves a half-written file.
+- The page art isn't in this repo; `www/` only has the HTML.
+
+## Files
+
+| File | What it is |
+|---|---|
+| [`generate.py`](generate.py) | Builds `stats.json` from the query and the logs |
+| [`www/index.html`](www/index.html) | The page |
+| [`docker-compose.yml`](docker-compose.yml) | nginx on port 8089, kept off the game cores |
+| [`systemd/`](systemd/) | The every-minute timer |

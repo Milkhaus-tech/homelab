@@ -42,7 +42,7 @@ handles Jellyfin invites.
 
 | What | Rule | Done by |
 |---|---|---|
-| Public trackers | delete at ratio 1.0 or after 24 h | cleanuparr |
+| Public trackers | delete at ratio 1.0 or after 24 h | cleanuparr (deletes finished torrents) |
 | Private tracker | seed forever | cleanuparr exemption |
 | Races (`race` category) | ratio 10 or 14 days per torrent, at most 15 grabs a week, 30 GB each | autobrr filter + qBittorrent |
 | Cleaning up races | only after 10 days of real seeding, and only once it's dead, stopped, or 21 days old; whole category capped at 500 GB | [`race-reaper.py`](scripts/race-reaper.py), hourly |

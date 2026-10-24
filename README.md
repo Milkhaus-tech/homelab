@@ -86,7 +86,7 @@ knowing before you copy it.
 - [`ops/`](ops/): nightly backups to a second drive, and alerts that message me when something's off
 - [`virtual-desktop/`](virtual-desktop/): a desktop on a monitor-less server that I stream to my phone, with a browser scripts can use
 - [`services/portmap`](services/portmap/): my cheat sheet of every port on every box
-- [`services/xmrig`](services/xmrig/): a CPU miner that backs off when the box gets hot (off right now)
+- [`services/xmrig`](services/xmrig/): a CPU miner that backs off when noahlab gets hot (off right now)
 - [`tools/`](tools/): the scripts that keep this repo safe to be public
 
 ## Stuff I learned the hard way
@@ -100,7 +100,7 @@ something broke first:
   ([what happened](docs/incidents.md#the-vpn-restarted-itself-579-times-in-a-night))
 - Jellyfin making thumbnails starved the game servers, and the fix was the GPU decoder,
   not the encoder ([what happened](docs/incidents.md#jellyfin-thumbnails-starved-the-game-servers))
-- one browser per fantasy league ran the box out of memory
+- one browser per fantasy league ran noahlab out of memory
   ([what happened](docs/incidents.md#too-many-browsers-ran-noahlab-out-of-memory))
 - the nightly backup was quietly skipping the files that actually mattered
   ([what happened](docs/incidents.md#the-backup-skipped-the-files-that-mattered))

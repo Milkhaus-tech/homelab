@@ -57,7 +57,13 @@ Wings network watchdog, Zomboid stats page) sit next to their services.
   stack. Editing a compose file does nothing until `up -d`.
 - Check whether an image is out of date by asking the app its version or comparing
   digests. The image's `Created` date is often frozen by reproducible builds.
-- [`portwatch.sh`](portwatch.sh) and [`portwatch-tally.sh`](portwatch-tally.sh) watch
-  game traffic on `wg0`, live or as a per-port count. The tally reads tcpdump through
-  file descriptor 3 instead of a pipe, which would put the counter in a subshell and show
-  zeros forever.
+- `portwatch-tally.sh` reads tcpdump through file descriptor 3 instead of a pipe. A pipe
+  would put the counter in a subshell and the screen would show zeros forever.
+
+## Files
+
+| File | What it is |
+|---|---|
+| [`backup-stacks.sh`](backup-stacks.sh) | Nightly backup of every box, as root |
+| [`homelab-alerts.sh`](homelab-alerts.sh) | Hourly health check |
+| [`portwatch.sh`](portwatch.sh), [`portwatch-tally.sh`](portwatch-tally.sh) | Live and per-port game traffic on `wg0` |
