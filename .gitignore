@@ -1,6 +1,7 @@
 # ── secrets: never in this repo ─────────────────────────────
 .env
 *.env
+burner.env*
 secrets.yml
 tools/.private-tokens
 *.key

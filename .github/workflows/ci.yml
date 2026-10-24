@@ -25,7 +25,7 @@ jobs:
       - name: docker compose config on every stack
         run: |
           set -e
-          for d in services/*/; do
+          for d in services/*/ services/*/*/; do
             [ -f "$d/docker-compose.yml" ] || continue
             echo "== $d"
             envfile=""

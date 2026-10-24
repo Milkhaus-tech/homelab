@@ -48,8 +48,9 @@ def add(label, val):
         pairs.append((label, val))
 
 # .env-style files: every value is a secret here
+import glob
 for envf in ["/home/noah/docker/qbittorrentvpn/.env", "/opt/monitoring/.env",
-             "/opt/donetick/.env"]:
+             "/opt/donetick/.env"] + glob.glob("services/igembed/burner.env*"):
     for line in read(envf).splitlines():
         m = re.match(r"\s*([A-Za-z0-9_]+)\s*=\s*(.+)$", line)
         if m and not line.lstrip().startswith("#"):
@@ -66,6 +67,79 @@ for f in ["/opt/homeassist/config/secrets.yaml", "/etc/pterodactyl/config.yml",
         # Home Assistant ships "some_password: welcome" as its example secret
         if m and (m.group(1), m.group(3).strip()) != ("some_password", "welcome"):
             add(f"{f}:{m.group(1)}", m.group(3))
+
+vps_ip = "".join(re.findall(r"\d+\.\d+\.\d+\.\d+", read("/home/noah/milkhaus-site/deploy.sh"))[:1])
+
+# stores on other boxes; an unreadable one fails the check rather than going unchecked
+def remote(box, path):
+    r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", box,
+                        f"sudo -n sh -c 'cat {path}'"], capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout:
+        print(f"UNREADABLE: {box}:{path}", file=sys.stderr); sys.exit(1)
+    return r.stdout
+
+# secret-named keys from stores that also hold hosts/urls/ports
+mixed = [(f, read(f)) for f in
+         ["/home/noah/docker/qbittorrentvpn/jfa-go/config/config.ini",
+          "/home/noah/docker/qbittorrentvpn/config/cross-seed/config.js",
+          "/usr/local/etc/fleet-alert.env", "/home/noah/goodnod/.env",
+          "/opt/pihole/docker-compose.yml"]
+         + glob.glob("/home/noah/discordbot/*/.env") + glob.glob("/home/noah/.config/teto/*.env")
+         + glob.glob("/home/noah/.config/audible/*.env") + glob.glob("/home/noah/.config/lair/*.env")]
+mixed += [(f"jesus:{p}", remote("jesus", p)) for p in
+          ["/opt/pterodactyl/var/.env", "/opt/pterodactyl/docker-compose.yml",
+           "/opt/monitoring/.env", "/etc/pterodactyl/config.yml", "/opt/frigate/docker-compose.yml"]]
+mixed += [("pablo:/etc/pterodactyl/config.yml", remote("pablo", "/etc/pterodactyl/config.yml"))]
+anykey = re.compile(r"(?:pass|password|secret|token|api_?key|_key|salt)[\"']?\s*[:=]\s*[\"']?([^\"'\s,;]+)", re.I)
+for label, text in mixed:
+    # comments carry examples like username:password@localhost, not secrets
+    text = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith(("#", "//", "*")))
+    for line in text.splitlines():
+        m = secretkey.match(line)
+        if m:
+            add(f"{label}:{m.group(1)}", m.group(3))
+    for v in anykey.findall(text) + re.findall(r"apikey=([A-Za-z0-9]+)", text, re.I):
+        add(f"{label}:inline", v)
+    for u, pw in re.findall(r"://([^:/@\s\"']+):([^@\s\"']+)@", text):
+        add(f"{label}:url-pass", pw)
+
+# JSON stores: every secret-named key, at any depth
+def walk(label, node):
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if isinstance(v, str) and re.search(r"pass|secret|token|api_?key|apikey", k, re.I):
+                add(f"{label}:{k}", v)
+            walk(label, v)
+    elif isinstance(node, list):
+        for v in node:
+            walk(label, v)
+for f in ["/home/noah/docker/qbittorrentvpn/config/jellyseerr/settings.json"] \
+         + glob.glob("/home/noah/docker/jellyfin/cloudflared/*.json"):
+    try:
+        walk(f, json.loads(read(f) or "{}"))
+    except json.JSONDecodeError:
+        print(f"WARN: {f} is not valid JSON; unchecked", file=sys.stderr)
+
+# WireGuard private keys on every box that publishes through this repo
+for box, text in [("noahlab", read("/etc/wireguard/wg0.conf")),
+                  ("vps", remote("root@" + vps_ip, "/etc/wireguard/wg0.conf")),
+                  ("jesus", remote("jesus", "/etc/wireguard/wg0.conf"))]:
+    for k in re.findall(r"^\s*(?:PrivateKey|PresharedKey)\s*=\s*(\S+)", text, re.M):
+        add(f"{box}:wireguard", k)
+
+# jesus's Frigate config: camera and MQTT credentials (the published copy comes from here)
+jfc = remote("jesus", "/opt/frigate/config/config.yaml")
+for u, pw in re.findall(r"rtsp://([^:/@\s]+):([^@\s]+)@", jfc):
+    add("jesus-frigate:camera-user", u); add("jesus-frigate:camera-pass", pw)
+for pw in re.findall(r"^\s*password:\s*(.+)$", jfc, re.M):
+    add("jesus-frigate:password", pw)
+add("jesus-vd-desktop:sunshine-pass", "".join(re.findall(r"VD_SUNSHINE_PASS:-([^}]+)\}", remote("jesus", "/home/noah/bin/vd-desktop"))))
+
+# igembed's burner session (Netscape cookie jar; #HttpOnly_ lines are cookies, not comments)
+for line in read("services/igembed/cookies.txt").splitlines():
+    parts = line.split("\t")
+    if len(parts) == 7 and (not line.startswith("#") or line.startswith("#HttpOnly_")):
+        add("igembed:cookie", parts[6])
 
 # mosquitto password hashes
 for line in read("/opt/homeassist/mosquitto/config/passwd").splitlines():
@@ -100,7 +174,7 @@ add("vd-flag:webhook", "".join(re.findall(r"api/webhook/([a-f0-9]+)", read("/hom
 # identity/topology strings that must stay out of the public tree
 add("identity:email-localpart", subprocess.run(["git", "config", "user.email"],
     capture_output=True, text=True).stdout.split("@")[0])
-add("identity:vps-ip", "".join(re.findall(r"\d+\.\d+\.\d+\.\d+", read("/home/noah/milkhaus-site/deploy.sh"))[:1]))
+add("identity:vps-ip", vps_ip)
 try:
     ts = json.loads(subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True).stdout)
     add("tailnet:suffix", ts.get("MagicDNSSuffix", ""))
@@ -111,10 +185,10 @@ try:
 except Exception:
     print("WARN: tailscale status unavailable; tailnet addresses unchecked", file=sys.stderr)
 
-# private rename tokens: the old names must not survive
-for line in read("tools/.private-tokens").splitlines():
-    if "=" in line:
-        add("private-token", line.split("=", 1)[0])
+# private rename tokens are sed regexes (priv() applies them case-insensitively), so
+# match them the same way; names are short, so no minimum length here
+private_res = [re.compile(line.split("=", 1)[0], re.I)
+               for line in read("tools/.private-tokens").splitlines() if "=" in line]
 
 # scan every publishable file for every value (raw + URL-encoded forms)
 targets = [f for f in os.environ["VERIFY_FILES"].splitlines() if f and os.path.isfile(f)]
@@ -126,6 +200,9 @@ for path in targets:
         if any(f in blob for f in forms if f):
             print(f"VALUE HIT: {label} found in {path}", file=sys.stderr)
             bad = 1
+    if not path.endswith((".png", ".jpg", ".gif", ".ico")) and any(r.search(blob) for r in private_res):
+        print(f"VALUE HIT: private-token found in {path}", file=sys.stderr)
+        bad = 1
 if not pairs:
     print("WARN: harvested zero live secrets — wrong box?", file=sys.stderr); sys.exit(1)
 print(f"value sweep: {len(pairs)} live secrets checked against {len(targets)} files")
