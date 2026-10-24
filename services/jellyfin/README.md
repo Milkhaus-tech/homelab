@@ -1,65 +1,46 @@
 # Jellyfin
 
-Streaming front-end for the media pipeline: GPU-transcoded, plugin-extended, with a
-curated free live-TV lineup rebuilt twice a day.
+The movie and TV site my friends and I watch on. [Jellyfin](https://jellyfin.org) is a
+self-hosted streaming server; this one transcodes on the GPU and has free live TV.
 
-## Version pinning
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable at:** `stream.milkhaus.net`, through a Cloudflare tunnel ([why](../../docs/architecture.md#how-traffic-gets-in)) · **Talks to:** the [media pipeline](../media/)
 
-The image is pinned (`jellyfin/jellyfin:10.11.11`), not `:latest`, because the
-File-Transformation plugin family is **ABI-pinned per Jellyfin patch version**: each
-release ships `Release-<version>.zip` builds, and the highest *version number* is often
-a different-ABI build that loads cleanly and then silently does nothing. A server bump
-means re-fetching the matching `Release-<newver>.zip` for every plugin in that family.
+## How it works
 
-| Plugin | Role |
+- **Version pinned** to `jellyfin/jellyfin:10.11.11`, not `:latest`. The home-screen
+  plugins (Media Bar, Home Screen Sections, and File Transformation, which they both
+  depend on) are built separately for each Jellyfin version. A build for the wrong
+  version can load fine and then do nothing. So a Jellyfin update also means grabbing
+  the matching `Release-<version>.zip` of each of those plugins.
+- **GPU transcoding** (NVENC/NVDEC on the GTX 1660 SUPER), with the session limit lifted
+  by the public [`nvidia-patch`](https://github.com/keylase/nvidia-patch). Two settings
+  that are off by default matter a lot:
+  - **10-bit HEVC/VP9 hardware decoding.** Without it every 10-bit file gets decoded on
+    the CPU at about 600%
+    ([what happened](../../docs/incidents.md#jellyfin-thumbnails-starved-the-game-servers)).
+  - **Transcode throttling.** A transcode pauses once the player has enough buffered,
+    instead of racing through the whole file.
+- **Live TV.** [`scripts/livetv-curate.py`](scripts/livetv-curate.py) builds an
+  84-channel lineup out of free ad-supported channels (Pluto, Samsung TV Plus, Roku),
+  using [BuddyChewChew's playlists](https://github.com/BuddyChewChew/app-m3u-generator)
+  and [i.mjh.nz](https://i.mjh.nz) guides. It picks mine out of about 1,500, numbers them
+  by type (100s sports, 200s news, and so on) and tells Jellyfin to refresh.
+- **Invites** go through jfa-go at `join.milkhaus.net`, which lives in the
+  [media stack](../media/). Accounts are invite-only.
+
+## Worth knowing
+
+- The live TV script runs at 05:45 and 17:45. The guide sources only carry 17–36 hours
+  of listings, so running it less often leaves gaps in the guide.
+- The script never overwrites a working guide with an empty one. `--selftest` tests it
+  offline.
+- Edit `encoding.xml` only while Jellyfin is stopped. It rewrites the file on shutdown.
+- The web plugins only change the browser version. Phone and TV apps look stock. After
+  changing plugins, hard-reload the browser.
+
+## Files
+
+| File | What it is |
 |---|---|
-| Media Bar | Home-screen hero carousel |
-| Home Screen Sections | Modern sectioned home (trimmed to 18 movie/show/request sections) |
-| File Transformation | Shared patching framework the two above depend on |
-| Trickplay | Hover-scrub previews, generated on the GPU |
-
-Plugins here patch the **web client only** — phone/TV apps render their stock UI. After
-plugin changes, hard-reload the browser: the injections live in `index.html` plus a
-hard-cached home chunk.
-
-## Encoding
-
-NVENC/NVDEC on the GTX 1660 SUPER, with the session limit lifted by the public
-`nvidia-patch`. Two non-default switches matter
-([incident #3](../../docs/incidents.md#3-jellyfin-trickplay-starves-the-game-servers)):
-
-- **10-bit HEVC/VP9 NVDEC enabled** — off by default, which silently software-decodes
-  every `yuv420p10le` file at ~600 % CPU while 8-bit uses the GPU. Turing decodes
-  HEVC Main10 fine; the RExt flags stay off (Turing cannot).
-- **Transcode throttling enabled** — playback transcodes pause once the client is
-  buffered ahead, instead of racing to encode the whole file.
-
-Edit `encoding.xml` only with the container stopped; Jellyfin rewrites it on shutdown.
-
-## Live TV — 84 curated channels
-
-[`scripts/livetv-curate.py`](scripts/livetv-curate.py) (cron 05:45 + 17:45) builds the
-tuner inputs from free, legal FAST feeds:
-
-- Playlists from the BuddyChewChew generator (Pluto / Samsung TV Plus / Roku US);
-  EPGs from i.mjh.nz. (The i.mjh.nz *playlists* are dead — only its EPGs work.)
-- Filters ~1,500 upstream channels down to a hand-picked `LINEUP`, renumbered by
-  bucket: 100s sports, 200s news, 300s entertainment, 400s anime, 500s music.
-- Writes `curated.m3u` + a merged, filtered `guide.xml` atomically, refuses to
-  overwrite on a zero-programme fetch, then triggers a Jellyfin guide refresh via API.
-- Lineup misses are logged, not fatal; `--selftest` covers the parse/filter/renumber
-  logic offline.
-
-Guide upstreams only carry ~17–36 h of data, so the twice-daily cadence is
-load-bearing — don't reduce it. DVR records to the media pool.
-
-## Invites
-
-Accounts are invite-only via **jfa-go** (defined in the [media stack](../media/)),
-which manages invite links and password resets against Jellyfin's user database.
-
-## Theming
-
-The web client carries a custom skin (accent overrides, login theme, custom loading
-spinner) injected through Jellyfin's branding API (`CustomCss` + `LoginDisclaimer`) —
-configuration state, not repo files; the art assets aren't redistributed here.
+| [`docker-compose.yml`](docker-compose.yml) | Jellyfin (pinned, GPU, kept off the game cores) and the Cloudflare tunnel |
+| [`scripts/livetv-curate.py`](scripts/livetv-curate.py) | Builds the live TV lineup and guide |

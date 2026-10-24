@@ -1,8 +1,9 @@
 # Media pipeline
 
-Thirteen services in one compose project: fully automated acquisition from request to
-library, with the torrent client sealed inside a VPN network namespace and the seeding
-policy enforced by code.
+Request a movie or show and it downloads, gets renamed and shows up in Jellyfin on its
+own. The torrent client can only reach the internet through a VPN.
+
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable at:** `request.milkhaus.net` (requests) and `join.milkhaus.net` (invites); everything else is Tailscale/LAN only · **Talks to:** [Jellyfin](../jellyfin/)
 
 ```mermaid
 flowchart LR
@@ -20,80 +21,55 @@ flowchart LR
     bazarr["Bazarr<br/>subtitles"] --> lib
 ```
 
-## VPN isolation
+## How it works
 
-qBittorrent runs with `network_mode: service:gluetun` — it has no network identity of
-its own. If the tunnel is down, torrents are off; there is no leak path to fail open.
-`depends_on: {gluetun: {restart: true}}` recreates the client whenever the tunnel
-container is recreated, and other services reach the WebUI at hostname `gluetun`.
+Thirteen containers in one compose file. Jellyseerr takes requests, Sonarr (shows) and
+Radarr (movies) find releases through Prowlarr, and qBittorrent downloads them. jfa-go
+handles Jellyfin invites.
 
-The provider-forwarded port (48592) is mirrored in gluetun's firewall input rules and
-qBittorrent's listen port, and is verified externally reachable on the VPN exit IP.
+- **VPN.** qBittorrent has no network of its own; it shares gluetun's (a VPN container).
+  If the tunnel is down, torrents just stop instead of falling back to my home
+  connection.
+- **Quality.** [Recyclarr](recyclarr/recyclarr.yml) syncs the
+  [TRaSH Guides](https://trash-guides.info/) quality presets every day and owns one
+  profile, "1080p Efficient". Small x265 1080p releases score +200 because the drive is
+  14 TB (TRaSH scores them way down by default), and season packs score higher still.
+  New releases wait 60 minutes for a better one unless they already score 200.
+- **Seeding.** On my private tracker I also race: autobrr watches the tracker's announce
+  channel and grabs brand-new uploads in the first minutes, which builds ratio. The
+  tracker hands out a hit-and-run (a strike) if you don't seed for 10 days after a
+  download.
 
-gluetun's health check uses IP literals and plain DNS on purpose — its default
-DoT-resolved health targets once turned a flaky resolver into 579 tunnel restarts in a
-night ([incident #2](../../docs/incidents.md#2-the-vpn-restart-loop-579-restarts-in-one-night)).
-
-## Quality policy (Recyclarr / TRaSH)
-
-[`recyclarr/recyclarr.yml`](recyclarr/recyclarr.yml) syncs TRaSH custom formats daily
-and owns the **"1080p Efficient"** profile in both apps:
-
-- WEB 1080p cutoff with 720p fallback, upgrades allowed.
-- **x265 (HD) scored +200** — deliberately inverting TRaSH's default −10000. Space-
-  efficient 1080p is the goal on a 14 TB pool; the standard "x265 ruins remuxes"
-  argument optimizes for a different library.
-- A 60-minute torrent delay profile smooths out bad early releases, **bypassed when
-  the custom-format score is ≥200** — well-formatted x265 releases grab instantly.
-- Anime keeps separate 720p-first, dub-boosted profiles that Recyclarr does not manage.
-
-## Seeding policy
-
-| Class | Rule | Enforced by |
+| What | Rule | Done by |
 |---|---|---|
-| Public trackers | delete at ratio 1.0 or 24 h | cleanuparr |
-| Private tracker | seed indefinitely | cleanuparr exemption |
-| Races (`race` category) | per-torrent ratio 10 / 14 d caps, ≤15 grabs/week, ≤30 GB | autobrr filter + qBittorrent |
-| Race reclamation | delete only when past the tracker's 10-day hit-and-run window **and** dead/stopped/aged out; 500 GiB category disk ceiling that never violates the window | [`scripts/race-reaper.py`](scripts/race-reaper.py) (hourly, self-tested) |
+| Public trackers | delete at ratio 1.0 or after 24 h | cleanuparr |
+| Private tracker | seed forever | cleanuparr exemption |
+| Races (`race` category) | ratio 10 or 14 days per torrent, at most 15 grabs a week, 30 GB each | autobrr filter + qBittorrent |
+| Cleaning up races | only after 10 days of real seeding, and only once it's dead, stopped, or 21 days old; whole category capped at 500 GB | [`race-reaper.py`](scripts/race-reaper.py), hourly |
 
-Queueing matches what the tracker actually limits: **3 active downloads** (the
-tracker grants exactly 3 slots — never raise it), seeds and announces unlimited. The
-old 75-slot cap parked torrents in `queuedUP`, where they stop announcing — which the
-tracker records as hit-and-runs
-([incident #6](../../docs/incidents.md#6-queue-policy-quietly-generates-tracker-hit-and-runs)).
+cross-seed finds tracker matches for stuff already on the drive and seeds them right
+away, hardlinked, so they cost no extra space.
 
-**autobrr** listens to the tracker's IRC announce channel and races matching releases
-into the `race` category with aggressive reannounce (7 s × 50). **cross-seed** (daemon
-mode) does the opposite of racing: it finds tracker matches for data already on disk
-and injects them as instant seeds, hardlinked, with the `race` category excluded.
+## Worth knowing
 
-## Policy engines
+- qBittorrent's queueing stays off. A queued torrent stops checking in with the tracker,
+  and the tracker counts that as not seeding
+  ([what happened](../../docs/incidents.md#queued-torrents-counted-as-hit-and-runs)).
+- gluetun's health check uses IP addresses and plain DNS. With hostnames it restarted
+  the tunnel all night
+  ([what happened](../../docs/incidents.md#the-vpn-restarted-itself-579-times-in-a-night)).
+- Don't run `docker image prune -a` here. Several images are local builds with nowhere to
+  re-pull them from. Plain `image prune` and `builder prune` are fine.
+- Downloads and the library are one filesystem so imports are hardlinks
+  ([why](../../docs/architecture.md#storage)). The qBittorrent password is stored in
+  Sonarr, Radarr, cleanuparr, autobrr and cross-seed too, so change it in all of them.
 
-Two standalone Python scripts (both dry-run by default, `--apply` in cron,
-`--selftest` runs an embedded policy test suite):
+## Files
 
-- [`scripts/race-reaper.py`](scripts/race-reaper.py) — the seeding-policy half that a
-  GUI can't express: hit-and-run-safe reclamation with a disk ceiling.
-- [`scripts/media-dedup.py`](scripts/media-dedup.py) — keeps exactly one video per
-  movie/episode. The *arr-tracked file always wins (nothing re-downloads), files
-  hardlinked into `downloads/` are never touched (they're seeding), and nothing is
-  hard-deleted — duplicates move to a dated quarantine with a JSONL restore manifest,
-  purged after 14 days.
-
-## Storage contract
-
-`/mnt/media` is one filesystem mounted identically (as `/media`) in qBittorrent,
-Radarr, Sonarr, unpackerr, and Jellyfin — imports are hardlinks, so a seeding copy
-costs zero extra bytes. Never split this into per-app mounts.
-
-## Operating notes
-
-- Validate config changes with `docker compose config -q`; apply with `up -d`.
-  These are long-uptime services — batch changes, recreate deliberately.
-- `docker image prune -a` is unsafe box-wide: several images are local builds with no
-  registry to re-pull. Plain `image prune` + `builder prune` only.
-- Secrets live in `.env` (mode 600) — see [`.env.example`](.env.example). API keys
-  for Recyclarr go in `recyclarr/secrets.yml`
-  ([example](recyclarr/secrets.yml.example)).
-- qBittorrent's WebUI requires auth except from the Tailscale range; Sonarr, Radarr,
-  cleanuparr, and autobrr store that credential — rotate all five together.
+| File | What it is |
+|---|---|
+| [`docker-compose.yml`](docker-compose.yml) | All 13 services |
+| [`.env.example`](.env.example) | The secrets the compose file expects |
+| [`recyclarr/`](recyclarr/) | Quality profile config, plus an example secrets file |
+| [`scripts/race-reaper.py`](scripts/race-reaper.py) | Deletes finished races without causing hit-and-runs. `--selftest` runs its tests |
+| [`scripts/media-dedup.py`](scripts/media-dedup.py) | Keeps one copy of each movie or episode. Duplicates go to a dated quarantine with a restore list, never straight to delete |

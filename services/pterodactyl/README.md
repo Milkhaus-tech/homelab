@@ -1,73 +1,54 @@
 # Pterodactyl game hosting
 
-Panel + native Wings hosting three dedicated servers — Project Zomboid, Factorio
-(Space Age), and Minecraft (Paper) — behind the [edge VPS](../../edge/), with
-self-healing infrastructure and unattended version management.
+The game servers for my friends: Factorio, Project Zomboid and Minecraft.
+[Pterodactyl](https://pterodactyl.io) is the web panel I run them from.
 
-## Moving parts
+**Runs on:** the panel on jesus, a game server on each box ([the boxes](../../README.md#the-boxes)) · **Reachable at:** `panel.milkhaus.net`; game ports come in through the VPS ([how](../../docs/architecture.md#game-servers))
 
-| Part | Where | Notes |
-|---|---|---|
-| Panel | compose here (`panel` + MariaDB + Redis), host `:8081` | fronted by `panel.milkhaus.net` at the edge; real secrets live in panel-managed `var/.env` (git-excluded) |
-| Wings | native binary, `wings.service` | game containers on its own docker network; config in `/etc/pterodactyl/` (holds the node token — never committed) |
-| Game servers | Wings-managed containers | pinned to CPU cores 12–15 (see [architecture](../../docs/architecture.md#compute-isolation)) |
-| Theme | `themes/` blade + css overlays, bind-mounted read-only | a pure overlay, no fork: revert = remove three mounts |
+## How it works
 
-## Self-healing: the network watchdog
+- **The panel** is this compose file (panel + MariaDB + Redis) on jesus, port 8081,
+  behind Caddy. Its real secrets live in a panel-managed `var/.env` that never gets
+  committed. My theme is three files mounted over the stock ones.
+- **Wings**, Pterodactyl's agent, runs natively on all three boxes and starts each game
+  in its own container. The panel reaches each one through Caddy at `node1.`, `jesus.`
+  and `pablo.milkhaus.net`.
+- **Factorio** is on noahlab, **Zomboid** on jesus, **Minecraft** on pablo. Factorio
+  and Zomboid get their own cores ([how](../../docs/architecture.md#keeping-games-smooth)).
 
-Wings creates its docker network **only at its own startup**; a stray
-`docker system prune` once deleted it and broke every server start for two weeks
-([incident #1](../../docs/incidents.md#1-docker-system-prune-deletes-a-game-network)).
-[`ptero-net-watchdog`](ptero-net-watchdog) + a 2-minute
-[timer](systemd/ptero-net-watchdog.timer) restarts Wings whenever the network is
-missing — recovery in ≤2 minutes instead of a two-week mystery.
+## Factorio updates
 
-## Unattended Factorio updates
+Factorio won't let you join a server on a different version, so
+[`factorio-autoupdate`](factorio-autoupdate) checks factorio.com every day at 06:00.
+When there's a new stable release it stops the server with `/quit` so the world saves,
+snapshots `saves/` with hard links, reinstalls, and only deletes the snapshot once the
+new version is hosting. Every step gets checked against the server's real state,
+because Wings answers "queued", not "done". It messages me if anything fails, and never
+starts a server I stopped myself.
 
-Cross-version multiplayer is impossible in Factorio: an outdated server is an
-unjoinable one. [`factorio-autoupdate`](factorio-autoupdate) (daily
-[timer](systemd/factorio-autoupdate.timer)) keeps the server on current stable:
+## Minecraft versions
 
-1. Compares the installed `data/base/info.json` against factorio.com's stable release
-   (a failed fetch keeps the working server and retries tomorrow).
-2. Stops via the egg's `/quit` so the world **saves** — never lets the reinstall's
-   grace period SIGKILL a save in progress.
-3. Hard-link snapshots `saves/` (zero space) before reinstalling; the snapshot is only
-   removed after the new build is confirmed *hosting*.
-4. Verifies each async Wings action against actual state — a 202 means "queued", not
-   "done" — and pushes a phone alert on any failure.
+- Paper's newest builds need **Java 25**. The default Java 21 image dies with a
+  one-line error, so the server uses the Java 25 image.
+- The plugins (EssentialsX, CoreProtect, GriefPrevention and friends) lag behind new
+  Minecraft releases, so the version is pinned to the newest one they all support.
+- The whitelist is managed from Discord by my bot, which checks names against Mojang
+  first. RCON is never forwarded from the VPS.
 
-It only updates; it never starts a server an admin deliberately stopped.
+## Worth knowing
 
-## Minecraft (Paper) — version traps
+- Wings only creates its Docker network when it starts, so a `docker system prune` can
+  break every server. [`ptero-net-watchdog`](ptero-net-watchdog) restarts Wings when the
+  network is missing. It's only on noahlab so far
+  ([what happened](../../docs/incidents.md#a-docker-prune-broke-every-game-server)).
+- A 502 in the panel logs usually means the WireGuard tunnel is down, not Wings.
+- Backups: the panel keeps three per server on each box, and the nightly
+  [backup](../../ops/) copies the panel database and every world to noahlab.
 
-Two pins that look arbitrary and aren't:
+## Files
 
-- Paper `latest` resolved to a Minecraft version requiring **Java 25**; the egg
-  default (Java 21) dies with a one-line error. The image is pinned to the Java 25
-  yolk.
-- The QOL plugin ecosystem (EssentialsX, CoreProtect, GriefPrevention) had **no
-  compatible builds** for the newest MC — `MINECRAFT_VERSION` is pinned to the newest
-  release where the whole plugin set works. Check compatibility before bumping;
-  `latest` strands the plugins again.
-
-RCON is LAN-only (deliberately never DNAT'd); the whitelist is driven from Discord by
-a bot cog that validates names against Mojang before adding. One plugin is banned
-after testing: a world-pregen plugin that reliably hung the server into a
-kill-only state despite claiming compatibility.
-
-## Network path
-
-Game UDP/TCP arrives via VPS DNAT over WireGuard — never through the HTTP proxy. Port
-onboarding needs **three** firewall layers (provider cloud firewall → ufw → DNAT) and
-game subdomains must be grey-cloud DNS-only records; the full story is in
-[docs/architecture.md](../../docs/architecture.md#the-edge-path). Panel↔Wings traffic
-hairpins through the edge (`behind_proxy`), so 502s in panel logs usually mean tunnel
-trouble, not a Wings bug.
-
-## Backups
-
-Nightly [`backup-stacks.sh`](../../ops/backup-stacks.sh) dumps the panel database
-(`mysqldump` inside the container, credentials never leave it) and tars panel + wings
-config; world saves ride the panel's own scheduled backups. A live stats page for the
-Zomboid server is generated separately — see [`services/pzstats`](../pzstats/).
+| File | What it is |
+|---|---|
+| [`docker-compose.yml`](docker-compose.yml), [`.env.example`](.env.example) | The panel, MariaDB and Redis |
+| [`factorio-autoupdate`](factorio-autoupdate), [`systemd/factorio-autoupdate.*`](systemd/) | The daily Factorio updater and its timer |
+| [`ptero-net-watchdog`](ptero-net-watchdog), [`systemd/ptero-net-watchdog.*`](systemd/) | Puts the Wings network back, every 2 minutes |

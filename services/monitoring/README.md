@@ -1,47 +1,59 @@
 # Monitoring
 
-Prometheus + Grafana with the box's dashboards **built from Python** — dashboard
-changes are code-reviewable diffs, and a wiped Grafana can be reconstructed by
-re-running two scripts.
+Prometheus collects numbers from every box and Grafana shows them. The two main
+dashboards are built from Python, so changing one shows up as a diff and a wiped Grafana
+comes back by re-running two scripts.
 
-## Scrape map
+**Runs on:** jesus (Prometheus + Grafana), with exporters on noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable from:** Tailscale and the LAN only
 
-| Job | Targets | Notes |
+## How it works
+
+[`docker-compose.yml`](docker-compose.yml) on jesus runs Prometheus, Grafana, cAdvisor
+(per-container stats) and a blackbox prober. [`exporters/`](exporters/) is the smaller
+compose file on noahlab: node_exporter, cAdvisor, and exportarr for Sonarr, Radarr and
+Prowlarr.
+
+What [`prometheus.yml`](prometheus.yml) scrapes:
+
+| Job | What | Notes |
 |---|---|---|
-| `node_stats` | this box, a desktop, and two miners (node_exporter) | the miners are powered down in summer heat, so their tiles read OFFLINE and count toward "problems" while they're off |
-| `cadvisor` | per-container CPU/memory/network | on 8098; 8080 is taken by qBittorrent |
-| `exportarr` ×3 | Sonarr / Radarr / Prowlarr | queue depth, library counts, indexer health |
-| `jellyfin` | native `/metrics` | generic .NET runtime metrics only — request rate is the honest health proxy |
-| `frigate` | `/api/metrics` | camera FPS, detector inference ms |
-| `homeassistant` | `/api/prometheus` | authenticated with a dedicated long-lived token mounted read-only (`ha_token`, file mode 400, never in git) |
+| `node_stats` | node_exporter on noahlab, jesus, pablo and my desktop | CPU, memory, disk, network |
+| `cadvisor` | noahlab and jesus | on port 8098, since qBittorrent has 8080 on noahlab |
+| `exportarr` | Sonarr, Radarr, Prowlarr | queue size, library counts, indexer health |
+| `jellyfin` | Jellyfin's `/metrics` | only generic .NET numbers, so request rate is the useful one |
+| `frigate` | `/api/metrics` on jesus | camera fps, detection time |
+| `homeassistant` | `/api/prometheus` | uses its own long-lived token from a file that's never in git |
+| `sites` | 16 public URLs through the blackbox prober | is each site up |
 
-## Dashboards as code
+## Dashboards
 
-[`dashboards/build_glance.py`](dashboards/build_glance.py) and
-[`build_overview.py`](dashboards/build_overview.py) emit complete dashboard JSON to
-stdout; deploying a change is:
+[`build_glance.py`](dashboards/build_glance.py) and
+[`build_overview.py`](dashboards/build_overview.py) print complete dashboard JSON.
+Deploying a change, on jesus:
 
 ```sh
 python3 dashboards/build_glance.py | curl -sS -X POST -H 'Content-Type: application/json' \
   -u "$GRAFANA_USER:$GRAFANA_PASS" -d @- http://localhost:3000/api/dashboards/db
 ```
 
-- **At a Glance** (`homelab-glance`): four host tiles, two usage rows, a Home Assistant row
-  (house temp/humidity/lights/batteries), and a 20-container UP/DOWN grid. Game-server
-  tiles match on the Wings container *label + image* rather than name, so they survive
-  a server being deleted and recreated under a new UUID.
-- **Homelab Overview** (`homelab-overview`): trends — per-host CPU/RAM, network with
-  transmit drawn below the axis, filesystem fill, top-10 containers, and service
-  panels (Jellyfin req/s, Frigate FPS + inference). The four host colors are a
-  CVD-validated set (adjacent-pair separation + surface contrast, both themes).
+- **At a Glance** (`homelab-glance`): a tile per box, usage, a house row from Home
+  Assistant (temperature, humidity, lights, batteries), and an up/down grid of the main
+  containers. Game server tiles match on the Wings label and image instead of the
+  container name, so they survive a server getting recreated.
+- **Homelab Overview** (`homelab-overview`): trends. CPU and memory per box, network,
+  disk fill, the top 10 containers, Jellyfin requests and Frigate fps.
 
-Both dashboards cross-link, with imported per-app dashboards tucked behind a tagged
-dropdown.
+## Worth knowing
 
-## Grafana hardening-adjacent notes
+- `GF_PANELS_DISABLE_SANITIZE_HTML` is on so a text panel can carry a styled banner.
+  That's fine on a Grafana only I log into. Don't copy it onto anything with other users.
+- The custom branding mounts art files that aren't in this repo.
 
-Grafana sits on the Tailscale/LAN ring only (see
-[exposure model](../../docs/architecture.md#exposure-model)). `GF_PANELS_DISABLE_SANITIZE_HTML`
-is on — a deliberate single-admin-box tradeoff to allow a styled HTML banner panel;
-don't copy that setting onto anything multi-user. News/analytics/update pings are off.
-The custom branding mounts overlay art files that aren't redistributed in this repo.
+## Files
+
+| File | What it is |
+|---|---|
+| [`docker-compose.yml`](docker-compose.yml), [`.env.example`](.env.example) | Prometheus, Grafana, cAdvisor and blackbox on jesus |
+| [`exporters/`](exporters/) | The exporters on noahlab |
+| [`prometheus.yml`](prometheus.yml) | Scrape config |
+| [`dashboards/`](dashboards/) | The two dashboard builders |

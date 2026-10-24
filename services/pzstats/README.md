@@ -1,8 +1,10 @@
 # pzstats
 
-A public live-stats page for the Project Zomboid server: who's on now, hours survived,
-real-world playtime, skills, and world size — nginx serving a static page plus a
-`stats.json` regenerated every minute by a systemd timer.
+A public live-stats page for my Project Zomboid server: who's on now, hours survived,
+real-world playtime, skills, and world size. It's nginx serving a static page plus a
+`stats.json` that a systemd timer rebuilds every minute.
+
+**Runs on:** noahlab, reading the game server's logs from jesus over NFS ([the boxes](../../README.md#the-boxes)) · **Reachable at:** [pz.milkhaus.net](https://pz.milkhaus.net)
 
 [`generate.py`](generate.py) merges three sources:
 

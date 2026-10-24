@@ -1,17 +1,29 @@
 # Donetick
 
-Self-hosted chore chart for the household. SQLite-backed, LAN/Tailscale only, with
-signup disabled — adding a user means temporarily flipping the flag.
+The household chore chart. [Donetick](https://donetick.com) is a small self-hosted app
+with recurring chores and reminders.
 
-The interesting part is the notification path: Donetick's own push needs HTTPS + web
-push, which this deployment skips. Instead its circle webhook posts to a
-`local_only` Home Assistant webhook, and
-[an automation](../home-assistant/automations.yaml) routes by event type —
-`task.reminder` goes to the **assignee's** phone (pre-due / due / overdue titles),
-`task.completed` notifies the *other* partner, with a deep link back to the chore
-list. The webhook carries no signature, hence `local_only` and the LAN threat model.
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable from:** Tailscale and the LAN only · **Talks to:** [Home Assistant](../home-assistant/)
 
-The JWT secret is overridden from [`.env`](.env.example) (verified against issued
-tokens — the yaml placeholder is intentionally not a secret); rotating it logs
-everyone out. The data dir stays owned by the login user so the nightly backup can
-read it.
+## How it works
+
+Donetick's own push notifications need HTTPS and web push, which I skipped. Instead,
+Donetick calls a webhook for the household (it calls that a circle), the webhook goes to
+Home Assistant, and [an automation](../home-assistant/automations.yaml) turns it into a
+phone notification: reminders go to whoever the chore belongs to, and when I finish one
+the other person in the house gets a "done" message with a link back to the list. My own
+reminders come through my assistant bot instead.
+
+## Worth knowing
+
+- Signup is turned off. To add a user, flip it on, make the account, flip it back.
+- The webhook isn't signed, so the Home Assistant side only accepts it from the LAN.
+- The JWT secret comes from [`.env`](.env.example). Changing it logs everyone out.
+- The data folder stays owned by my user so the nightly backup can read it.
+
+## Files
+
+| File | What it is |
+|---|---|
+| [`docker-compose.yml`](docker-compose.yml) | Donetick, pinned to v0.1.76 |
+| [`.env.example`](.env.example) | The JWT secret |
