@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Reap autobrr-raced torrents (qBittorrent category 'race').
 
-Deletes torrent+files once tracker hit-and-run-safe (10d seedtime) AND
-dead (72h no activity) / stopped / past 21d; unfinished races die after 7d.
+Deletes torrent+files once tracker hit-and-run-safe (qB seeding_time,
+not wall-clock — tracker only counts announced time) AND dead (72h no activity) /
+stopped / past 21d; unfinished races die after 7d.
 Also enforces a total disk ceiling for the category (oldest deadest first).
 Dry-run by default; --apply deletes; --selftest runs policy checks.
 """
@@ -15,7 +16,8 @@ import urllib.parse
 import urllib.request
 
 CATEGORY = 'race'
-TRACKER_SAFE_HOURS = 240      # tracker hit-and-run clears at 10 days of seeding
+TRACKER_SAFE_HOURS = 264      # tracker clears H&R at 10d tracker-side seedtime; qB's
+                         # seeding_time can lead tracker's count, keep 24h margin
 DEAD_HOURS = 72          # no swarm activity for this long => dead race
 HARD_CAP_HOURS = 504     # 21 days seeded: reclaim even if still trickling
 STALE_DL_HOURS = 168     # unfinished for 7 days => race lost, reclaim
@@ -45,20 +47,24 @@ def on_disk(t):
     return max(0, t['size'] - t['amount_left'])
 
 
+def seed_hours(t):
+    """Actual active seed time (what tracker's H&R counter tracks), not wall-clock."""
+    return t.get('seeding_time', 0) / HRS
+
+
 def decide(t, now):
     """Reason string to delete this torrent, or None to keep it."""
     if t['amount_left'] > 0 or t['completion_on'] <= 0:
         if (now - t['added_on']) / HRS >= STALE_DL_HOURS:
             return 'stale-incomplete'
         return None
-    seeded_h = (now - t['completion_on']) / HRS
-    if seeded_h < TRACKER_SAFE_HOURS:
+    if seed_hours(t) < TRACKER_SAFE_HOURS:
         return None
     if t['state'].startswith(('stopped', 'paused')):
         return 'stopped'
     if (now - t['last_activity']) / HRS >= DEAD_HOURS:
         return 'dead-swarm'
-    if seeded_h >= HARD_CAP_HOURS:
+    if seed_hours(t) >= HARD_CAP_HOURS:
         return 'age-cap'
     return None
 
@@ -72,7 +78,7 @@ def cap_victims(kept, now):
         return [], total
     safe = [t for t in kept
             if t['amount_left'] == 0 and t['completion_on'] > 0
-            and (now - t['completion_on']) / HRS >= TRACKER_SAFE_HOURS]
+            and seed_hours(t) >= TRACKER_SAFE_HOURS]
     safe.sort(key=lambda t: (not t['state'].startswith(('stopped', 'paused')),
                              t['last_activity']))
     victims = []
@@ -122,17 +128,20 @@ def selftest():
     def t(**kw):
         base = dict(hash='x', name='t', category=CATEGORY, state='uploading',
                     size=10 * 2**30, amount_left=0, ratio=1.0,
-                    added_on=now - 12 * day, completion_on=now - 11 * day,
-                    last_activity=now - 1 * HRS)
+                    added_on=now - 13 * day, completion_on=now - 12 * day,
+                    seeding_time=12 * day, last_activity=now - 1 * HRS)
         base.update(kw)
         return base
 
-    assert decide(t(completion_on=now - 2 * day, added_on=now - 2 * day), now) is None, 'young keeps'
+    assert decide(t(seeding_time=2 * day), now) is None, 'young keeps'
     assert decide(t(last_activity=now - 4 * day), now) == 'dead-swarm'
     assert decide(t(), now) is None, 'active safe torrent keeps'
-    assert decide(t(completion_on=now - 22 * day, added_on=now - 23 * day), now) == 'age-cap'
+    assert decide(t(seeding_time=22 * day), now) == 'age-cap'
     assert decide(t(state='stoppedUP'), now) == 'stopped'
-    assert decide(t(state='stoppedUP', completion_on=now - 5 * day), now) is None, 'H&R window protects'
+    assert decide(t(state='stoppedUP', seeding_time=5 * day), now) is None, 'H&R window protects'
+    missing = t()
+    missing.pop('seeding_time')
+    assert decide(missing, now) is None, 'missing seeding_time fails safe'
     assert decide(t(amount_left=2**30, completion_on=0, added_on=now - 2 * day), now) is None, 'young download keeps'
     assert decide(t(amount_left=2**30, completion_on=0, added_on=now - 8 * day), now) == 'stale-incomplete'
 
@@ -141,8 +150,7 @@ def selftest():
     victims, total = cap_victims([idle, busy], now)
     assert [v['hash'] for v in victims] == ['a'] and total <= DISK_CAP_GB * 2**30, 'cap prefers idle'
     assert cap_victims([t(size=100 * 2**30)], now) == ([], 100 * 2**30), 'under cap untouched'
-    victims, total = cap_victims([t(hash='c', size=600 * 2**30, completion_on=now - 2 * day,
-                                    added_on=now - 3 * day)], now)
+    victims, total = cap_victims([t(hash='c', size=600 * 2**30, seeding_time=2 * day)], now)
     assert victims == [] and total > DISK_CAP_GB * 2**30, 'H&R window blocks cap deletes'
     print('selftest OK')
 

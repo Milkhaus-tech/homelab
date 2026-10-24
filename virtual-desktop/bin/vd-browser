@@ -9,7 +9,9 @@ if curl -s --max-time 2 http://127.0.0.1:9222/json/version >/dev/null; then
 fi
 export DISPLAY=:0 XAUTHORITY=/home/noah/.Xauthority
 # snap.chromium.* scope name: snap refuses plain launches from ssh/agent session cgroups
-systemd-run --user --scope --quiet --unit "snap.chromium.chromium-vd$(date +%s)" \
+# MemorySwapMax=0 stops this browser dragging the host into swap-thrash (the wedge cause);
+# MemoryMax=16G is a hard ceiling on the 31G box. Contained OOM instead of a dead host.
+systemd-run --user --scope --quiet -p MemorySwapMax=0 -p MemoryMax=16G --unit "snap.chromium.chromium-vd$(date +%s)" \
     -- /snap/bin/chromium \
     --user-data-dir="$PROFILE" \
     --remote-debugging-port=9222 \

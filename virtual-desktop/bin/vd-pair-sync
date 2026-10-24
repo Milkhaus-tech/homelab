@@ -32,9 +32,13 @@ def main() -> int:
         print("your primary desktop has no paired devices yet — pair one there first")
         return 1
 
-    targets = sorted(HOME.glob("sunshine-L*/"))
+    # The two desktops that exist. This globbed sunshine-L*/ from the per-league era, so
+    # after the rework it faithfully synced pairings to six directories nothing reads and
+    # none to the two that do — a device paired on :0 still asked for a PIN on both.
+    targets = [HOME / f"sunshine-{role}" for role in ("standard", "warroom", "lair", "claude")]
+    targets = [t for t in targets if t.exists()]
     if not targets:
-        print("no league desktops yet")
+        print("no audible desktops yet — start one with vd-desktop start standard")
         return 0
 
     for directory in targets:
@@ -43,13 +47,16 @@ def main() -> int:
             state = json.loads(state_path.read_text())
         else:
             # Keep the instance's own identity; only the trust list is shared.
-            state = {"root": {"uniqueid": f"AUDIBLE-{directory.name[-2:]}-0000-0000-000000000000"}}
+            state = {"root": {}}
         state.setdefault("root", {})
         # A distinct, stable identity per desktop, or Moonlight cannot tell the hosts apart
-        # in its list. Derived from the slot so it survives a rebuild of the state file.
+        # in its list. Derived from the role so it survives a rebuild of the state file —
+        # it used to parse a slot number out of "sunshine-L3", which the named desktops
+        # have not had since the rework.
         if not state["root"].get("uniqueid"):
-            slot = directory.name.split("-L")[-1]
-            state["root"]["uniqueid"] = f"AUD1BLE{int(slot):02d}-0000-1000-8000-00805F9B34FB"
+            role = directory.name.replace("sunshine-", "")
+            number = {"standard": 1, "warroom": 2, "lair": 3, "claude": 4}.get(role, 9)
+            state["root"]["uniqueid"] = f"AUD1BLE{number:02d}-0000-1000-8000-00805F9B34FB"
         existing = {d.get("uuid"): d for d in devices(state)}
         for device in trusted:
             existing.setdefault(device.get("uuid"), device)
@@ -61,8 +68,8 @@ def main() -> int:
         state_path.write_text(json.dumps(state, indent=2))
         print(f"{directory.name}: {len(existing)} trusted device(s)")
 
-    print("\nRestart any running league desktop for this to take effect:")
-    print("  vd-league-desktop stop <slot> && vd-league-desktop start <slot>")
+    print("\nRestart any running Audible desktop for this to take effect:")
+    print("  vd-desktop stop <role> && vd-desktop start <role>")
     return 0
 
 

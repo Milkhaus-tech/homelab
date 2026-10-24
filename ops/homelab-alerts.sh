@@ -8,7 +8,10 @@ now=$(date +%s)
 declare -A fire
 
 pct=$(df -P /mnt/media 2>/dev/null | awk 'NR==2{print $5+0}'); pct=${pct:-0}
-[ "$pct" -ge "${ALERT_DISK_PCT:-85}" ] && fire[disk]="media disk ${pct}% full"
+# disk alerts by band: a new higher band alerts at once; 85-94% repeats weekly, 95%+ daily
+# (it re-alerted at 85-89% every day for 8 weeks, which taught everyone to ignore it)
+band=0; for b in "${ALERT_DISK_PCT:-85}" 90 95; do [ "$pct" -ge "$b" ] && band=$b; done
+[ "$band" -gt 0 ] && fire[disk]="media disk ${pct}% full"
 
 newest=$(find /mnt/media/backups -mindepth 1 -maxdepth 1 -type d -name '????-??-??' -printf '%Ts\n' 2>/dev/null | sort -n | tail -1)
 if [ -z "$newest" ]; then fire[backup-age]="no dated backup dirs under /mnt/media/backups"
@@ -25,12 +28,20 @@ send=""; new=""
 for k in disk backup-age dead-containers mirror; do
   m=${fire[$k]:-}
   if [ -z "$m" ]; then [ "$dry" = 1 ] && echo "ok      $k"; continue; fi
-  last=$(awk -v k="$k" '$1==k&&$2~/^[0-9]+$/{print $2}' "$state" 2>/dev/null)
-  if [ -z "$last" ] || [ $(( now - last )) -ge 86400 ]; then
-    send+="${send:+; }$m"; new+="$k $now"$'\n'
+  read -r last lastsig <<<"$(awk -v k="$k" '$1==k&&$2~/^[0-9]+$/{print $2, $3}' "$state" 2>/dev/null)"
+  # dead-containers re-alerts on a changed set, not just every 24h — a standing
+  # alert must never mask a newly dead container (masked mcstats on 2026-08-19)
+  sig=""; every=86400; changed=0
+  [ "$k" = dead-containers ] && sig=$down && [ "$sig" != "$lastsig" ] && changed=1
+  if [ "$k" = disk ]; then
+    sig=$band; [ "$band" -lt 95 ] && every=604800
+    [ "$band" -gt "${lastsig:-${ALERT_DISK_PCT:-85}}" ] && changed=1
+  fi
+  if [ -z "$last" ] || [ $(( now - last )) -ge "$every" ] || [ "$changed" = 1 ]; then
+    send+="${send:+; }$m"; new+="$k $now${sig:+ $sig}"$'\n'
     [ "$dry" = 1 ] && echo "FIRING  $k: $m -> would alert"
   else
-    new+="$k $last"$'\n'
+    new+="$k $last${lastsig:+ $lastsig}"$'\n'
     [ "$dry" = 1 ] && echo "FIRING  $k: $m -> suppressed, last alert $(( (now - last) / 3600 ))h ago"
   fi
 done

@@ -5,6 +5,8 @@
 #               agent needs a signed-in browser for.
 #   warroom   — dormant. Comes up five minutes before a REAL draft and goes away after,
 #               so nothing shares a connection with the one event that cannot be redone.
+#   lair      — dormant. Comes up three minutes before a Secret Lair drop, driven by
+#               ~/bin/lair. Memory-capped, because its wake time is the store's to pick.
 #
 # One desktop per league was the previous shape and it did not survive contact: six idle
 # Chromiums plus the docker stack drove a 32GB box into the OOM killer, which took three
@@ -21,10 +23,12 @@ PRIMARY_PROFILE=/home/noah/vd-chromium
 
 usage() {
     cat <<USAGE
-usage: vd-desktop {start|stop|status|info} [standard|warroom]
+usage: vd-desktop {start|stop|status|info} [standard|warroom|lair]
 
   start standard     bring up the everyday desktop (idempotent)
   start warroom      bring up the draft war room
+  start lair         bring up the Secret Lair checkout desktop
+  start claude       bring up the generic Claude agent desktop
   stop warroom       tear it down again
   status             what is running
   info <role>        connection details for Moonlight
@@ -34,9 +38,20 @@ USAGE
 
 paths() {
     case "$ROLE" in
-        standard) NUM=11; ;;
-        warroom)  NUM=12; ;;
-        *) echo "role must be 'standard' or 'warroom'"; usage ;;
+        standard) NUM=11; LIMITS=(); EXTRA=() ;;
+        warroom)  NUM=12; LIMITS=(); EXTRA=() ;;
+        # Capped, unlike the audible pair: this one wakes on a drop schedule Noah does not
+        # control, onto a box whose swap is routinely near full. Killed alone beats taking
+        # Frigate or Home Assistant with it.
+        # Xvfb has no GPU, so WebGL is simply absent here — a canvas/WebGL fingerprint
+        # anomaly on an origin that runs Akamai Bot Manager for its checkout. SwiftShader
+        # is software rendering: it makes a real browser report a real renderer.
+        lair)     NUM=13; LIMITS=(-p MemoryMax=1.5G -p MemorySwapMax=0)
+                  EXTRA=(--enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader) ;;
+        # Generic Claude/agent scratch desktop — isolated profile kept unseeded (no league logins).
+        claude)   NUM=14; LIMITS=(-p MemoryMax=8G -p MemorySwapMax=0)
+                  EXTRA=(--enable-unsafe-swiftshader --use-gl=angle --use-angle=swiftshader) ;;
+        *) echo "role must be 'standard', 'warroom', 'lair' or 'claude'"; usage ;;
     esac
     DISPLAY_NUM=":${NUM}"
     CDP_PORT=$((9300 + NUM))
@@ -47,6 +62,25 @@ paths() {
     RUN_DIR="/home/noah/.local/state/vd-desktop/${ROLE}"
 }
 
+# Every address a browser might reach this box on. Sunshine rejects any origin absent
+# from csrf_allowed_origins, which is what surfaces as "CSRF Protection Error" in the
+# web UI — previously only the tailscale IP and localhost were listed, so the LAN
+# address and the hostname both tripped it.
+web_origins() {
+    local port="$1" ts_name
+    {
+        echo localhost
+        echo 127.0.0.1
+        # Real interfaces only: docker/bridge addresses are container-side, never typed.
+        ip -4 -o addr show scope global 2>/dev/null \
+            | awk '$2 !~ /^(docker|br-|veth|pterodactyl)/ {split($4,a,"/"); print a[1]}'
+        hostname
+        echo "$(hostname).local"
+        ts_name=$(tailscale status --json 2>/dev/null | jq -r '.Self.DNSName // empty' 2>/dev/null)
+        [ -n "$ts_name" ] && echo "${ts_name%.}"
+    } | awk 'NF && !seen[$0]++' | sed "s|.*|https://&:${port}|" | paste -sd, -
+}
+
 start() {
     paths
     mkdir -p "$SUN_DIR" "$RUN_DIR"
@@ -54,14 +88,32 @@ start() {
     if [ -e "/tmp/.X11-unix/X${NUM}" ]; then
         echo "display $DISPLAY_NUM already up"
     else
-        Xvfb "$DISPLAY_NUM" -screen 0 "${GEOMETRY}x24" -nolisten tcp >"$RUN_DIR/xvfb.log" 2>&1 &
-        sleep 2
+        # Its own transient unit, not our child: this script is run by a Type=oneshot
+        # timer unit, and when that oneshot exits systemd reaps its cgroup — a backgrounded
+        # Xvfb died ~50s after every wake, over and over, while a draft was starting. Snap
+        # Chromium escapes into its own scope, which is why only X kept dying.
+        systemd-run --user --collect --unit "vd-${ROLE}-xvfb" \
+            sh -c "exec Xvfb $DISPLAY_NUM -screen 0 ${GEOMETRY}x24 -nolisten tcp >$RUN_DIR/xvfb.log 2>&1"
+        # Wait for the socket, do not guess at it. A flat "sleep 2" was long enough on a
+        # quiet box and not on a busy one — Xvfb compiles an xkb keymap first — so Chromium
+        # launched against a display that did not exist yet, reported "chromium started",
+        # and died with an X connection error. That is how the war room would have failed
+        # on draft night, the one event that cannot be re-run.
+        for _ in $(seq 1 40); do
+            [ -e "/tmp/.X11-unix/X${NUM}" ] && break
+            sleep 0.5
+        done
+        if [ ! -e "/tmp/.X11-unix/X${NUM}" ]; then
+            echo "display $DISPLAY_NUM never came up — see $RUN_DIR/xvfb.log" >&2
+            return 1
+        fi
         DISPLAY="$DISPLAY_NUM" setxkbmap us 2>/dev/null || true
         echo "display $DISPLAY_NUM started (${GEOMETRY})"
     fi
 
     if ! pgrep -f "xfwm4 --display=$DISPLAY_NUM" >/dev/null 2>&1; then
-        DISPLAY="$DISPLAY_NUM" xfwm4 --display="$DISPLAY_NUM" >"$RUN_DIR/wm.log" 2>&1 &
+        systemd-run --user --collect --unit "vd-${ROLE}-wm" --setenv DISPLAY="$DISPLAY_NUM" \
+            sh -c "exec xfwm4 --display=$DISPLAY_NUM >$RUN_DIR/wm.log 2>&1"
         sleep 1
     fi
 
@@ -75,10 +127,10 @@ start() {
     else
         DISPLAY="$DISPLAY_NUM" XAUTHORITY=/home/noah/.Xauthority \
         systemd-run --user --scope --quiet --unit "snap.chromium.chromium-${ROLE}-$(date +%s)" \
-            -- /snap/bin/chromium \
+            "${LIMITS[@]}" -- /snap/bin/chromium \
             --user-data-dir="$PROFILE" \
             --remote-debugging-port="$CDP_PORT" \
-            --no-first-run --restore-last-session --start-maximized \
+            --no-first-run --start-maximized \
             --window-size="${GEOMETRY/x/,}" \
             --renderer-process-limit=2 \
             --disable-dev-shm-usage \
@@ -86,6 +138,7 @@ start() {
             --disable-breakpad \
             --disable-component-update \
             --js-flags="--max-old-space-size=384" \
+            "${EXTRA[@]}" \
             >"$RUN_DIR/chromium.log" 2>&1 &
         sleep 3
         echo "chromium started (CDP 127.0.0.1:${CDP_PORT})"
@@ -96,12 +149,11 @@ start() {
     else
         /home/noah/bin/vd-pair-sync >/dev/null 2>&1 || true
         local origins
-        origins=$(sed -n 's/^csrf_allowed_origins *= *//p' /home/noah/.config/sunshine/sunshine.conf \
-            | head -1 | tr ',' '\n' | sed -E "s/:[0-9]+$/:${WEB_PORT}/" | paste -sd, -)
-        [ -n "$origins" ] || origins="https://<tailscale-ip>:${WEB_PORT},https://localhost:${WEB_PORT}"
+        origins=$(web_origins "${WEB_PORT}")
         cat > "$SUN_DIR/sunshine.conf" <<CONF
 port = ${SUN_PORT}
 capture = x11
+encoder = software
 sunshine_name = Audible ${ROLE}
 file_state = ${SUN_DIR}/state.json
 log_path = ${SUN_DIR}/sunshine.log
@@ -111,9 +163,8 @@ native_pen_touch = disabled
 CONF
         DISPLAY="$DISPLAY_NUM" sunshine "$SUN_DIR/sunshine.conf" --creds "$SUNSHINE_USER" "$SUNSHINE_PASS" \
             >"$RUN_DIR/sunshine-creds.log" 2>&1
-        DISPLAY="$DISPLAY_NUM" setsid /home/noah/bin/vd-input-bridge \
-            --display "$DISPLAY_NUM" -- sunshine "$SUN_DIR/sunshine.conf" \
-            >"$RUN_DIR/sunshine.log" 2>&1 &
+        systemd-run --user --collect --unit "vd-${ROLE}-sunshine" --setenv DISPLAY="$DISPLAY_NUM" \
+            sh -c "exec /home/noah/bin/vd-input-bridge --display $DISPLAY_NUM -- sunshine $SUN_DIR/sunshine.conf >$RUN_DIR/sunshine.log 2>&1"
         sleep 6
         echo "sunshine started (Moonlight ${SUN_PORT}, web ${WEB_PORT}, input bridged)"
     fi
@@ -121,8 +172,15 @@ CONF
     info
 }
 
+stop_units() {
+    for unit in "vd-${ROLE}-sunshine" "vd-${ROLE}-wm" "vd-${ROLE}-xvfb"; do
+        systemctl --user stop "$unit" 2>/dev/null
+    done
+}
+
 stop() {
     paths
+    stop_units
     pkill -f "vd-input-bridge --display ${DISPLAY_NUM} " 2>/dev/null
     pkill -f "sunshine ${SUN_DIR}/sunshine.conf" 2>/dev/null
     pkill -f "remote-debugging-port=${CDP_PORT}" 2>/dev/null
@@ -149,7 +207,7 @@ INFO
 
 status() {
     printf '%-10s %-8s %-10s %-9s %s\n' ROLE DISPLAY CDP SUNSHINE STATE
-    for role in standard warroom; do
+    for role in standard warroom lair claude; do
         ROLE=$role; paths
         local up=""
         [ -e "/tmp/.X11-unix/X${NUM}" ] && up="display"

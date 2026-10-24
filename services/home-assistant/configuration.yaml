@@ -5,6 +5,9 @@ default_config:
 # Load frontend themes from the themes folder
 frontend:
   themes: !include_dir_merge_named themes
+  # card-mod must load before the dashboard shell for theme-level (card-mod-root) styling
+  extra_module_url:
+    - /hacsfiles/lovelace-card-mod/card-mod.js
 
 automation: !include automations.yaml
 script: !include scripts.yaml
@@ -14,5 +17,123 @@ stream:
   part_duration: 0.75
   segment_duration: 6
 
+# Feeder cameras via the go2rtc-tuya relay (/opt/homeassist/go2rtc): HA's own
+# Tuya camera entities go stale after ~10 min and stream H.265 that WebRTC can't carry.
+camera:
+  - platform: ffmpeg
+    name: Gumball Cam
+    input: rtsp://127.0.0.1:8556/gumball
+  - platform: ffmpeg
+    name: Margarita Cam
+    input: rtsp://127.0.0.1:8556/margarita
+
 # Prometheus metrics endpoint at /api/prometheus (scraped by /opt/monitoring stack)
 prometheus:
+
+# Pet feeders: direct LAN control on port 6668, no Tuya cloud (see tuya_feed.py)
+shell_command:
+  feed_tuya: python3 /config/tuya_feed.py {{ feeder }} {{ portions | default(1) }}
+  # Fire TV: resume the signed-in Jellyfin account's show (see jellyfin_resume.py)
+  jellyfin_resume: python3 /config/jellyfin_resume.py
+
+# qBittorrent tracker ratio + transfer totals (auth bypassed via qB subnet whitelist)
+command_line:
+  - sensor:
+      name: qBittorrent tracker stats
+      unique_id: qbittorrent_tl_stats
+      command: python3 /config/qb_stats.py
+      scan_interval: 120
+      value_template: "{{ value_json.tl_ratio }}"
+      json_attributes:
+        - tl_count
+        - tl_uploaded_gib
+        - tl_downloaded_gib
+        - alltime_ul_gib
+        - alltime_dl_gib
+        - session_ul_gib
+        - session_dl_gib
+  # Kiosk System tab: tracker standings (written by ~/bin/tracker-slots-sync.mjs) + lab rundown from Prometheus
+  - sensor:
+      name: tracker
+      unique_id: tracker_stats
+      command: cat /config/tl_stats.json
+      scan_interval: 300
+      value_template: "{{ value_json.ratio }}"
+      json_attributes: [class, uploaded, downloaded, ratio, points, slots, hnr, updated]
+  - sensor:
+      name: Lab status
+      unique_id: lab_status
+      command: python3 /config/lab_status.py
+      scan_interval: 60
+      value_template: "{{ value_json.state }}"
+      json_attributes: [nodes, services, nodes_up, nodes_total, services_up, services_total, down, updated]
+
+# Per-room light groups for the kiosk dashboard (Downstairs Lights is a UI helper)
+light:
+  - platform: group
+    name: Living Room Lights
+    unique_id: living_room_lights
+    entities:
+      - light.living_room_living_room_1
+      - light.living_room_living_room_2
+      - light.living_room_living_room_3
+      - light.living_room_living_room_4
+  - platform: group
+    name: Kitchen Lights
+    unique_id: kitchen_lights
+    entities:  # govee_light_local (LAN); the H600B living-room bulbs have no LAN API and stay cloud
+      - light.kitchen1_local
+      - light.kitchen2_local
+      - light.kitchen3_local
+      - light.kitchen4_local
+
+# Living Room Fire TV's Jellyfin session -> playing / paused / idle (drives the light dimming automation)
+rest:
+  - resource: http://192.168.1.10:8096/Sessions?activeWithinSeconds=900
+    headers:
+      X-Emby-Token: !secret jellyfin_api_key
+    scan_interval: 5
+    sensor:
+      - name: Living Room Jellyfin playback
+        unique_id: living_room_jellyfin_playback
+        value_template: >-
+          {%- set ns = namespace(playing=false, paused=false) -%}
+          {%- for s in value_json if s.Client == 'Jellyfin Android TV' and 'fire tv' in (s.DeviceName | lower) and s.NowPlayingItem is defined and s.NowPlayingItem -%}
+            {%- if s.PlayState is defined and s.PlayState.IsPaused is defined -%}
+              {%- if s.PlayState.IsPaused is false -%}
+                {%- set ns.playing = true -%}
+              {%- elif s.PlayState.IsPaused is true -%}
+                {%- set ns.paused = true -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {{- 'playing' if ns.playing else 'paused' if ns.paused else 'idle' -}}
+
+# Anyone downstairs, per Frigate person detection on the living room (tapo_3) and kitchen (tapo_5) cams
+binary_sensor:
+  - platform: group
+    name: Downstairs person
+    unique_id: downstairs_person
+    device_class: occupancy
+    entities:
+      - binary_sensor.tapo_3_person_occupancy
+      - binary_sensor.tapo_5_person_occupancy
+
+# Clock/date badges for the kiosk (now() re-renders every minute)
+template:
+  - sensor:
+      - name: Kiosk Clock
+        unique_id: kiosk_clock
+        icon: mdi:clock-outline
+        state: "{{ now().strftime('%-I:%M %p') }}"
+      - name: Kiosk Date
+        unique_id: kiosk_date
+        icon: mdi:calendar-today
+        state: "{{ now().strftime('%A, %B %-d') }}"
+
+# TV search passthrough: type here, an automation forwards it to the Fire TV
+input_text:
+  tv_search_query:
+    name: Type on TV
+    icon: mdi:magnify
+    max: 100

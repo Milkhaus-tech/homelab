@@ -31,8 +31,8 @@ def color_override(name, color):
             "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": color}}]}
 
 # Fixed host->hue map; validated for CVD separation + surface contrast (dataviz checks)
-HOST_COLORS = (("192.168.1.10:9100", TETO), ("192.168.1.13:9100", DESKTOP_BLUE),
-               ("192.168.1.11:9100", JESUS_AMBER), ("192.168.1.12:9100", PABLO_TEAL))
+HOST_COLORS = (("192.168.1.210:9100", TETO), ("192.168.1.213:9100", DESKTOP_BLUE),
+               ("192.168.1.211:9100", JESUS_AMBER), ("192.168.1.212:9100", PABLO_TEAL))
 host_overrides = lambda: [color_override(i, c) for i, c in HOST_COLORS]
 
 def ts(title, targets, unit, x, y, w=12, h=8, extra_defaults=None, overrides=None,
@@ -61,10 +61,10 @@ downth = [{"color": "green", "value": None}, {"color": "red", "value": 1}]
 panels = [
     # Row A — headline tiles
     stat("Targets down", "count(up == 0) or vector(0)", "none", 0, 0, thresholds=downth, decimals=0),
-    stat("Noahlab CPU", '100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="192.168.1.10:9100"}[5m])) * 100)', "percent", 4, 0, thresholds=pct),
-    stat("Noahlab RAM", '(1 - node_memory_MemAvailable_bytes{instance="192.168.1.10:9100"} / node_memory_MemTotal_bytes{instance="192.168.1.10:9100"}) * 100', "percent", 8, 0, thresholds=pct),
-    stat("Root FS used", '100 - (node_filesystem_avail_bytes{instance="192.168.1.10:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="192.168.1.10:9100",mountpoint="/"} * 100)', "percent", 12, 0, thresholds=pct),
-    stat("Noahlab temp", 'max(node_hwmon_temp_celsius{instance="192.168.1.10:9100"})', "celsius", 16, 0, thresholds=tempth),
+    stat("Noahlab CPU", '100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="192.168.1.210:9100"}[5m])) * 100)', "percent", 4, 0, thresholds=pct),
+    stat("Noahlab RAM", '(1 - node_memory_MemAvailable_bytes{instance="192.168.1.210:9100"} / node_memory_MemTotal_bytes{instance="192.168.1.210:9100"}) * 100', "percent", 8, 0, thresholds=pct),
+    stat("Root FS used", '100 - (node_filesystem_avail_bytes{instance="192.168.1.210:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="192.168.1.210:9100",mountpoint="/"} * 100)', "percent", 12, 0, thresholds=pct),
+    stat("Noahlab temp", 'max(node_hwmon_temp_celsius{instance="192.168.1.210:9100"})', "celsius", 16, 0, thresholds=tempth),
     stat("Containers", 'count(container_last_seen{name!=""})', "none", 20, 0, decimals=0),
     # Row B — service status grid
     {
@@ -89,18 +89,18 @@ panels = [
        overrides=host_overrides()),
     # Row D — network + disk
     ts("Network throughput (Noahlab)", [
-        target('sum(rate(node_network_receive_bytes_total{instance="192.168.1.10:9100",device!~"lo|veth.*|br-.*|docker.*"}[5m])) * 8', "receive"),
-        target('sum(rate(node_network_transmit_bytes_total{instance="192.168.1.10:9100",device!~"lo|veth.*|br-.*|docker.*"}[5m])) * 8', "transmit"),
+        target('sum(rate(node_network_receive_bytes_total{instance="192.168.1.210:9100",device!~"lo|veth.*|br-.*|docker.*"}[5m])) * 8', "receive"),
+        target('sum(rate(node_network_transmit_bytes_total{instance="192.168.1.210:9100",device!~"lo|veth.*|br-.*|docker.*"}[5m])) * 8', "transmit"),
        ], "bps", 0, 17,
        desc="Transmit drawn below the axis; physical NICs only (bridges/veth excluded).",
        overrides=[{"matcher": {"id": "byName", "options": "transmit"},
                    "properties": [{"id": "custom.transform", "value": "negative-Y"}]}]),
     ts("Filesystem used %", [target('100 - (node_filesystem_avail_bytes{fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{fstype=~"ext4|xfs|btrfs"} * 100)', "{{instance}} {{mountpoint}}")],
        "percent", 12, 17, extra_defaults={"min": 0, "max": 100}),
-    # Row E — temps: heat is what governs the two miners' duty cycle
+    # Row E — temps
     ts("Temperature per host", [target('max by(instance) (node_hwmon_temp_celsius)', "{{instance}}")],
        "celsius", 0, 25, w=24, overrides=host_overrides(),
-       desc="Hottest hwmon sensor per host. Jesus and Pablo get powered off when summer heat makes them impractical."),
+       desc="Hottest hwmon sensor per host."),
     # Row F — containers (many series: default palette, list legend to keep height sane)
     ts("Top 10 containers by CPU", [target('topk(10, sum by(name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) * 100)', "{{name}}")],
        "percent", 0, 33, extra_defaults={"min": 0}, legend_table=False),

@@ -11,28 +11,51 @@
 <meta property="og:url" content="https://pz.milkhaus.net/">
 <meta property="og:title" content="TETO ZONE — Project Zomboid">
 <meta property="og:description" content="Live player stats, survival times, skills and outfits. Play inside of Project Zomboid: pz.milkhaus.net">
-<meta property="og:image" content="https://pz.milkhaus.net/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
+<meta property="og:image" content="https://pz.milkhaus.net/og.gif">
+<meta property="og:image:width" content="640">
+<meta property="og:image:height" content="335">
 <meta property="og:image:alt" content="TETO ZONE — Project Zomboid server">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="TETO ZONE — Project Zomboid">
 <meta name="twitter:description" content="Live player stats, survival times and outfits.">
-<meta name="twitter:image" content="https://pz.milkhaus.net/og.png">
+<meta name="twitter:image" content="https://pz.milkhaus.net/og.gif">
 <meta name="theme-color" content="#e21e37">
 <meta name="description" content="Live stats for the TETO ZONE Project Zomboid server.">
 <link rel="icon" href="teto-shocked.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
 
 <style>
   :root{
-    --bg:#0b0c0e; --panel:#141619; --line:#23262b; --line-soft:#1b1e22;
+    --bg:#0b0c0e; --panel:rgba(20,22,25,.84); --line:#23262b; --line-soft:#1b1e22;
     --ink:#e8eaed; --ink-2:#a8aeb6; --ink-3:#6d7480;
     --red:#e21e37; --red-l:#ff5c6c; --green:#3fbf6f; --amber:#d9a441;
     --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55}
+  body{margin:0;background:transparent;color:var(--ink);font-family:var(--sans);line-height:1.55}
+
+  /* ---------- teto backdrop ---------- */
+  /* html carries the ground so the fixed layers below can sit at z-index -1
+     without falling behind the propagated body background. */
+  html{background:var(--bg)}
+  body::before,body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
+  body::before{background:
+    radial-gradient(58% 44% at 82% -6%,  rgba(226,30,55,.26) 0%, transparent 68%),
+    radial-gradient(52% 40% at 8% 4%,    rgba(226,30,55,.30) 0%, transparent 70%),
+    radial-gradient(70% 50% at 50% 108%, rgba(226,30,55,.18) 0%, transparent 72%),
+    linear-gradient(180deg, #101013 0%, var(--bg) 55%)}
+  /* oversized so the transform drift never exposes an edge; transform keeps it
+     on the compositor instead of repainting the viewport every frame. */
+  body::after{inset:-320px;background:url("teto-pattern.svg") repeat;background-size:300px 300px;
+              opacity:.075;will-change:transform;
+              -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 24%,#000 66%,transparent 96%);
+              mask-image:linear-gradient(180deg,transparent 0%,#000 24%,#000 66%,transparent 96%)}
+  @media (prefers-reduced-motion:no-preference){
+    body::after{animation:drift 120s linear infinite}
+  }
+  @keyframes drift{to{transform:translate3d(300px,300px,0)}}
+
   .wrap{max-width:62rem;margin:0 auto;padding:2.5rem 1.25rem 4rem;display:flex;flex-direction:column;gap:2rem}
 
   /* ---------- header ---------- */
@@ -107,8 +130,43 @@
   tbody tr:last-child td{border-bottom:0}
   td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
   .who{font-weight:650}
-  td.av{width:52px;padding-right:0;line-height:0}
-  td.av svg{border-radius:4px;border:1px solid var(--line)}
+  td.av{width:58px;padding-right:0;line-height:0}
+  td.av .ava{width:42px;height:42px}
+
+  /* ---------- avatar disc: monogram + presence ---------- */
+  .ava{position:relative;display:inline-block;line-height:0;flex:none}
+  .ava svg{display:block;width:100%;height:100%}
+  .ava.on::after{content:"";position:absolute;right:2%;bottom:2%;width:26%;height:26%;
+    border-radius:50%;background:var(--green);border:2px solid #0f1115;
+    animation:presence 2.6s ease-out infinite}
+  .ava.dead{filter:grayscale(1);opacity:.5}
+  @keyframes presence{0%{box-shadow:0 0 0 0 rgba(63,191,111,.55)}
+                      70%{box-shadow:0 0 0 6px rgba(63,191,111,0)}
+                      100%{box-shadow:0 0 0 0 rgba(63,191,111,0)}}
+
+  /* ---------- who is online right now ---------- */
+  .livebar{display:flex;flex-direction:column;gap:.85rem}
+  .livehead{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;
+            border-bottom:1px solid var(--line);padding-bottom:.55rem}
+  .livehead h2{border:0;padding:0;margin:0}
+  .pill{display:inline-flex;align-items:center;gap:.35rem;font-family:var(--mono);font-size:.6rem;
+        letter-spacing:.14em;color:var(--green);border:1px solid rgba(63,191,111,.35);
+        background:rgba(63,191,111,.08);border-radius:2px;padding:.2rem .42rem}
+  .pill i{width:.4rem;height:.4rem;border-radius:50%;background:var(--green);
+          animation:blink 2.2s ease-in-out infinite}
+  .pill.off{color:var(--ink-3);border-color:var(--line);background:transparent}
+  .pill.off i{background:var(--ink-3);animation:none}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.22}}
+  .online{display:flex;flex-wrap:wrap;gap:.6rem}
+  .pchip{display:flex;align-items:center;gap:.65rem;background:var(--panel);border:1px solid var(--line);
+         border-left:3px solid var(--green);padding:.5rem .85rem .5rem .6rem;cursor:pointer;
+         color:inherit;font:inherit;text-align:left;transition:border-color .15s,background .15s}
+  .pchip:hover{border-color:var(--green);background:#171b1e}
+  .pchip .ava{width:38px;height:38px}
+  .pchip b{display:block;font-weight:650;font-size:.92rem;line-height:1.25}
+  .pchip .t{font-family:var(--mono);font-size:.7rem;color:var(--ink-3)}
+  .none{margin:0;color:var(--ink-3);font-size:.9rem;background:var(--panel);
+        border:1px solid var(--line);border-left:3px solid var(--line);padding:.9rem 1rem}
   .fit{font-size:.7rem;color:var(--ink-3);margin-top:.15rem;max-width:15rem}
   /* cross-promo to the other server */
   .other{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;
@@ -125,6 +183,88 @@
   .skill b{color:var(--red-l);font-weight:600}
   .bar{height:4px;background:#22262c;border-radius:2px;overflow:hidden;margin-top:.35rem;min-width:6rem}
   .bar i{display:block;height:100%;background:var(--red)}
+
+  /* --- map --- */
+  .mapwrap{position:relative;background:#0f1215;border:1px solid var(--line);
+           aspect-ratio:16/9;min-height:340px;max-height:70vh}
+  #pzmap{width:100%;height:100%;background:#12161a}
+  .leaflet-container{background:#0f1215;font-family:var(--sans)}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .leaflet-popup-content{margin:.6rem .8rem;font-size:.85rem}
+  .leaflet-control-zoom a{background:var(--panel);color:var(--ink-2);border-color:var(--line)}
+  .leaflet-control-zoom a:hover{background:#20242a;color:var(--ink)}
+  .mapbtn{display:block;background:var(--panel);color:var(--ink-2);border:1px solid var(--line);
+          border-radius:3px;font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;
+          padding:.35rem .55rem;text-decoration:none;white-space:nowrap;line-height:1}
+  .mapbtn:hover{color:var(--ink);border-color:var(--red)}
+  .leaflet-control-attribution{background:rgba(11,12,14,.75);color:var(--ink-3);font-size:.62rem}
+  .leaflet-control-attribution a{color:var(--ink-3)}
+  .pin,.basepin{background:none;border:0}
+  .pin .ava{position:relative;width:38px;height:38px;margin:0 auto;
+            filter:drop-shadow(0 3px 5px rgba(0,0,0,.85))}
+  .pin .nm,.basepin .nm{font-family:var(--mono);font-size:.6rem;color:#fff;text-align:center;
+           text-shadow:0 1px 3px #000,0 0 6px #000;margin:1px -40px 0;white-space:nowrap}
+  /* dim the disc, never the label - the map underneath is light paper and a
+     faded name on it is unreadable */
+  .pin.off .ava{opacity:.42}
+  .pin.off .nm{color:#d3d8de}
+  .pin.dead .ava{filter:grayscale(1) drop-shadow(0 2px 3px rgba(0,0,0,.8))}
+  /* live halo, expanding out from behind the disc */
+  .pin.on .ava::before{content:"";position:absolute;inset:-2px;border-radius:50%;
+    border:2px solid var(--green);animation:halo 2.6s ease-out infinite}
+  @keyframes halo{0%{transform:scale(.9);opacity:.85}100%{transform:scale(1.5);opacity:0}}
+  /* only applied for the moment a marker is actually moving, so pan and zoom
+     never drag a transition behind them */
+  .leaflet-marker-icon.glide{transition:transform 1.2s cubic-bezier(.25,.7,.3,1)}
+  .basepin .ring{width:44px;height:44px;border-radius:50%;border:2px solid var(--red);
+    background:rgba(226,30,55,.18);display:flex;align-items:center;justify-content:center;
+    color:#fff;font-family:var(--mono);font-weight:700;font-size:.9rem;
+    box-shadow:0 0 14px rgba(226,30,55,.5)}
+  .basepin.on .ring{border-color:var(--green);background:rgba(63,191,111,.16);
+    box-shadow:0 0 14px rgba(63,191,111,.45)}
+  .pop h4{margin:0 0 .3rem;font-size:.9rem}
+  .pop .r{display:flex;align-items:center;gap:.45rem;margin:.2rem 0;font-size:.82rem}
+  .pop .r svg{width:26px;height:26px;flex:none}
+  .pop a{color:var(--red-l);cursor:pointer}
+  .pop .on{color:var(--green)}
+  .mapfoot{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+  .maplegend{display:flex;gap:1rem;flex-wrap:wrap;font-family:var(--mono);font-size:.7rem;
+             color:var(--ink-3);padding:.5rem .2rem 0}
+  .maplegend i{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;
+               background:var(--red);margin-right:.3rem;vertical-align:middle}
+  .maplegend b{display:inline-block;width:.7rem;height:.7rem;background:#2b4030;
+               margin-right:.3rem;vertical-align:middle}
+
+  /* --- hour chart --- */
+  .hours{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;align-items:end;height:90px;
+         background:var(--panel);border:1px solid var(--line);padding:.7rem .6rem .35rem}
+  .hours div{background:#2c3540;border-radius:1px 1px 0 0;position:relative;min-height:2px}
+  .hours div.on{background:var(--red)}
+  .hours div:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;
+     transform:translateX(-50%);background:#000;color:var(--ink);font-family:var(--mono);
+     font-size:.62rem;padding:.1rem .3rem;border:1px solid var(--line);white-space:nowrap;z-index:5}
+  .hourlabels{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;font-family:var(--mono);
+              font-size:.56rem;color:var(--ink-3);padding:.25rem .6rem 0;text-align:center}
+
+  /* --- sortable + expandable table --- */
+  thead th.s{cursor:pointer;user-select:none}
+  thead th.s:hover{color:var(--ink-2)}
+  thead th.s::after{content:"";opacity:.35;margin-left:.3rem}
+  thead th.s.asc::after{content:"\25B2";opacity:1;color:var(--red)}
+  thead th.s.desc::after{content:"\25BC";opacity:1;color:var(--red)}
+  tr.row{cursor:pointer}
+  tr.row:hover td{background:#191d22}
+  tr.detail td{background:#101317;padding-top:.2rem}
+  .dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr));gap:.9rem;padding:.5rem 0 .7rem}
+  .dbox .dk{font-family:var(--mono);font-size:.62rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3)}
+  .dbox .dv{font-size:.86rem;color:var(--ink-2);margin-top:.2rem}
+  .sk{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem}
+
+  /* --- sparkline --- */
+  .spark{display:block;width:100%;height:44px}
+  .spark path{fill:none;stroke:var(--red);stroke-width:1.6}
+  .spark .area{fill:var(--red);opacity:.14;stroke:none}
 
   footer{color:var(--ink-3);font-size:.78rem;font-family:var(--mono);
          border-top:1px solid var(--line);padding-top:1rem;display:flex;flex-direction:column;gap:.35rem}
@@ -144,6 +284,7 @@
     .ip .ghost{display:none}
   }
 </style>
+<script src="vendor/leaflet.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -178,13 +319,39 @@
 
   <section class="cards" id="cards"></section>
 
+  <section class="livebar">
+    <div class="livehead">
+      <span class="pill" id="livepill"><i></i>LIVE</span>
+      <h2 id="livetitle">Online now</h2>
+    </div>
+    <div id="onlinelist"><p class="none">checking who's in Knox County…</p></div>
+  </section>
+
+  <section>
+    <h2>Where everyone is</h2>
+    <div class="mapwrap"><div id="pzmap"></div></div>
+    <div class="maplegend mapfoot">
+      <span>green ring = online right now · click a pin for detail · zoom in to split a group</span>
+      <span id="posage"></span>
+    </div>
+  </section>
+
+  <section>
+    <h2>When people play <span style="color:var(--ink-3);font-weight:400">· sessions by hour</span></h2>
+    <div class="hours" id="hours"></div>
+    <div class="hourlabels" id="hourlabels"></div>
+  </section>
+
   <section>
     <h2>Survivors</h2>
     <div class="scroller">
       <table>
         <thead><tr>
-          <th colspan="2">Survivor</th><th class="num">Playtime</th><th class="num">Survived</th>
-          <th class="num">Sessions</th><th>Skills</th>
+          <th colspan="2" class="s" data-k="name">Survivor</th>
+          <th class="num s desc" data-k="playtime_hours">Playtime</th>
+          <th class="num s" data-k="hours_survived">Survived</th>
+          <th class="num s" data-k="sessions">Sessions</th>
+          <th class="s" data-k="total_skill">Skills</th>
         </tr></thead>
         <tbody id="rows"><tr><td colspan="6">loading…</td></tr></tbody>
       </table>
@@ -194,7 +361,7 @@
   <a class="other" href="https://mc.milkhaus.net/">
     <img src="teto-shocked.png" alt="">
     <span>
-      <span class="t">We also run Minecraft — MILKHAUS</span>
+      <span class="t">TETO ZONE also runs Minecraft</span>
       <span class="d">Paper 26.1.2 with the usual quality-of-life plugins. Whitelisted via Discord.</span>
     </span>
     <span class="go">mc.milkhaus.net →</span>
@@ -209,71 +376,364 @@
 <script>
 const fmt = n => (n ?? 0).toLocaleString();
 const card = (k,v,n) => `<div class="card"><span class="k">${k}</span><span class="v">${v}</span><span class="n">${n||""}</span></div>`;
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let DATA = null;                 // stats.json, the 60s half
+let LIVE = {}, ONLINE = new Set();  // live.json, the 10s half
+let sortKey = "playtime_hours", sortDir = -1;
+let openRow = null;
 
 document.getElementById("copy").addEventListener("click", async () => {
   const btn = document.getElementById("copy");
-  try{
-    await navigator.clipboard.writeText("pz.milkhaus.net");
-    btn.textContent = "copied"; btn.classList.add("done");
-  }catch{
-    btn.textContent = "select it"; // clipboard blocked (insecure context / permissions)
-  }
-  setTimeout(()=>{ btn.textContent="copy"; btn.classList.remove("done"); }, 2000);
+  try{ await navigator.clipboard.writeText("pz.milkhaus.net"); btn.textContent="copied"; btn.classList.add("done"); }
+  catch{ btn.textContent="select it"; }
+  setTimeout(()=>{ btn.textContent="copy"; btn.classList.remove("done"); },2000);
 });
 
-function render(d){
-  const s = d.server || {};
-  const dot = document.getElementById("dot");
-  dot.className = "dot " + (s.online ? "up" : "down");
-  document.getElementById("statusText").textContent = s.online
-    ? `online — ${s.players}/${s.max} playing right now`
-    : "offline";
+/* ---------- survivor map on the real Muldraugh world map ----------
+   worldmap.png ships with the game at 10234x8314 covering world tiles
+   0-19800 x, 0-15900 y. That mapping was verified by cropping the image at
+   three live player positions: they landed on Muldraugh, Rosewood and
+   Riverside respectively. Tiles are a vips pyramid, z6 = native resolution. */
+const MAP_PX = {w:10234, h:8314}, WORLD = {w:19800, h:15900}, MAXZ = 6;
+const CLUSTER_PX = 34;        // screen distance that reads as "the same spot"
+let MAP=null, IMG=null;
+const PINS = new Map();       // cluster key -> marker, so pins move instead of respawning
 
-  const w = d.world || {};
-  const top = [...(d.players||[])].sort((a,b)=>b.hours_survived-a.hours_survived)[0];
-  document.getElementById("cards").innerHTML = [
-    card("Online now", s.online ? `${s.players}` : "—", s.online ? `of ${s.max} slots` : "server down"),
-    card("Survivors", fmt((d.players||[]).length), "characters made"),
-    card("Total playtime", `${fmt(w.combined_playtime_hours)}h`, "across everyone"),
-    card("Longest survival", top ? `${fmt(top.hours_survived)}h` : "—", top ? top.name : ""),
-    card("World size", `${fmt(w.size_mb)} MB`, `${fmt(w.chunks)} chunk files`)
-  ].join("");
+/* Knox County is 1.23:1 but the box is wider than that, so fitting the whole
+   image letterboxes it. getBoundsZoom(_, true) is the zoom at which the image
+   COVERS the box instead, which is the floor we want - the frame is then always
+   full of map and panning can never reach the void. */
+function fitCover(){
+  const z = MAP.getBoundsZoom(IMG, true);
+  MAP.setMinZoom(z);
+  if(MAP.getZoom() < z) MAP.setZoom(z, {animate:false});
+}
 
-  const max = Math.max(...(d.players||[]).map(p=>p.playtime_hours), 1);
-  document.getElementById("rows").innerHTML = (d.players||[]).map(p=>{
-    const sk = Object.entries(p.skills||{})
-      .map(([k,v])=>`<span class="skill">${k} <b>${v}</b></span>`).join("")
-      || '<span class="skill">none yet</span>';
+function wholeMapControl(){
+  const C = L.Control.extend({options:{position:"topright"},
+    onAdd(){
+      const a = L.DomUtil.create("a", "mapbtn");
+      a.href = "#"; a.title = "Zoom out to all of Knox County"; a.textContent = "WHOLE MAP";
+      L.DomEvent.on(a, "click", e => { L.DomEvent.stop(e); MAP.fitBounds(IMG); });
+      return a;
+    }});
+  MAP.addControl(new C());
+}
+
+/* Open on where people actually are - the world is mostly unvisited, so the
+   whole-map view is a lot of empty paper. */
+function frameOnPlayers(ps){
+  if(!ps.length){ MAP.fitBounds(IMG); return; }
+  const live = ps.filter(p => p.online);
+  const pts = (live.length ? live : ps).map(p => worldToLatLng(p.pos.x, p.pos.y));
+  MAP.fitBounds(L.latLngBounds(pts).pad(0.6), {maxZoom:4, animate:false});
+}
+
+function worldToLatLng(x, y){
+  return MAP.unproject([x * MAP_PX.w / WORLD.w, y * MAP_PX.h / WORLD.h], MAXZ);
+}
+
+function initMap(){
+  MAP = L.map("pzmap", {crs:L.CRS.Simple, maxZoom:MAXZ, zoomControl:true,
+                        attributionControl:true, zoomSnap:.25, zoomDelta:.5});
+  // the pyramid is padded out to a square, so tiles past the image are 404s;
+  // handing the layer explicit bounds stops it asking for them at all
+  const sw = MAP.unproject([0, MAP_PX.h], MAXZ), ne = MAP.unproject([MAP_PX.w, 0], MAXZ);
+  IMG = L.latLngBounds(sw, ne);
+  L.tileLayer("maptiles/{z}/{y}/{x}.jpg", {
+    minZoom:0, maxZoom:MAXZ, maxNativeZoom:MAXZ, tileSize:256, noWrap:true, bounds:IMG,
+    keepBuffer:4, updateWhenZooming:false, updateWhenIdle:false,
+    attribution:"Map data © The Indie Stone · Project Zomboid"
+  }).addTo(MAP);
+  MAP.setMaxBounds(IMG);
+  // exactly one view is set here: Leaflet schedules zoom animations on a frame
+  // callback, so a second init view change lands on top of the first one later
+  const z0 = MAP.getBoundsZoom(IMG, true);
+  MAP.setMinZoom(z0);
+  MAP.setView(IMG.getCenter(), z0, {animate:false});
+  MAP.on("resize", fitCover);
+  // clusters are measured in screen pixels, so zooming changes who groups
+  MAP.on("zoomend", syncMap);
+  MAP.on("zoomstart", () =>
+    document.querySelectorAll(".leaflet-marker-icon.glide").forEach(e => e.classList.remove("glide")));
+  wholeMapControl();
+}
+
+/* Group by screen distance, not world distance: zoom out and a base is one
+   marker, zoom in and the survivors in it separate and move on their own. */
+function clusterPlayers(ps){
+  const out=[];
+  for(const p of ps){
+    const pt = MAP.latLngToLayerPoint(worldToLatLng(p.pos.x, p.pos.y));
+    const hit = out.find(c => c.pt.distanceTo(pt) < CLUSTER_PX);
+    if(hit) hit.members.push(p); else out.push({pt, x:p.pos.x, y:p.pos.y, members:[p]});
+  }
+  for(const c of out) c.members.sort((a,b) => (b.online?1:0)-(a.online?1:0));
+  return out;
+}
+
+/* The transition lives on the icon only while it is actually travelling, so a
+   pan or a zoom never drags one behind the map. */
+function glide(m, ll){
+  const el = m.getElement();
+  if(el){
+    el.classList.add("glide");
+    clearTimeout(m._gt);
+    m._gt = setTimeout(() => el.classList.remove("glide"), 1300);
+  }
+  m.setLatLng(ll);
+}
+
+const pinClass = c => c.members.length > 1
+  ? "basepin" + (c.members.some(m => m.online) ? " on" : "")
+  : "pin" + (c.members[0].online ? " on" : " off") + (c.members[0].pos.dead ? " dead" : "");
+
+function pinHtml(c){
+  if(c.members.length > 1)
+    return `<div class="ring">${c.members.length}</div><div class="nm">${
+      c.members.some(m=>m.online) ? c.members.filter(m=>m.online).length+" here now" : "base"}</div>`;
+  const p = c.members[0];
+  return `<span class="ava${p.online?" on":""}">${p.avatar||""}</span><div class="nm">${esc(p.name)}</div>`;
+}
+
+const posLine = p => `${fmt(p.pos.x)}, ${fmt(p.pos.y)}`;
+
+function popupHtml(c){
+  if(c.members.length === 1){
+    const p = c.members[0];
+    return `<div class="pop"><h4>${esc(p.name)}${p.online?' <span class="on">· online</span>':""}</h4>
+      <div class="r"><span class="ava" style="width:26px;height:26px">${p.avatar||""}</span>
+      <span>${posLine(p)}<br>${p.playtime_hours}h played · ${fmt(p.hours_survived)}h survived</span></div>
+      <a onclick="focusPlayer('${esc(p.name)}')">see full detail ↓</a></div>`;
+  }
+  const list = c.members.map(m =>
+    `<div class="r"><span class="ava${m.online?" on":""}" style="width:26px;height:26px">${m.avatar||""}</span>
+     <span><b>${esc(m.name)}</b>${m.online?' <span class="on">· online</span>':""}<br>
+     ${m.playtime_hours}h · ${fmt(m.hours_survived)}h survived</span></div>`).join("");
+  return `<div class="pop"><h4>${c.members.length} survivors here</h4>
+    <div style="color:var(--ink-3);font-size:.75rem;margin-bottom:.35rem">
+      around ${fmt(Math.round(c.x))}, ${fmt(Math.round(c.y))}</div>${list}</div>`;
+}
+
+/* Merge the 60s stats with the 10s live feed, then reconcile markers against
+   what is already on the map - moving the ones that stayed, so they animate. */
+function mapPlayers(){
+  const pos = LIVE.positions || {};
+  return (DATA?.players || [])
+    .map(p => ({...p, pos: pos[p.name] || p.pos, online: ONLINE.has(p.name)}))
+    .filter(p => p.pos && !p.pos.dead);
+}
+
+function syncMap(){
+  if(!MAP) return;
+  const ps = mapPlayers();
+  const keep = new Set();
+  for(const c of clusterPlayers(ps)){
+    const key = c.members.map(m => m.name).sort().join("|");
+    keep.add(key);
+    const ll = worldToLatLng(c.x, c.y), cls = pinClass(c), html = pinHtml(c);
+    const size = c.members.length > 1 ? [46,60] : [40,58];
+    let m = PINS.get(key);
+    if(!m){
+      m = L.marker(ll, {icon:L.divIcon({className:cls, iconSize:size, iconAnchor:[size[0]/2, size[1]-6], html})})
+           .addTo(MAP).bindPopup(popupHtml(c));
+      PINS.set(key, m);
+    }else{
+      if(!m.getLatLng().equals(ll)) glide(m, ll);
+      if(m._sig !== cls+html)
+        m.setIcon(L.divIcon({className:cls, iconSize:size, iconAnchor:[size[0]/2, size[1]-6], html}));
+      const pop = popupHtml(c);
+      if(m._pop !== pop){ m.setPopupContent(pop); m._pop = pop; }
+    }
+    m._sig = cls + html;
+  }
+  for(const [k, m] of PINS) if(!keep.has(k)){ m.remove(); PINS.delete(k); }
+  if(!syncMap.framed && ps.length){ syncMap.framed = true; frameOnPlayers(ps); }
+}
+
+/* Clicking someone in the online strip flies to them and opens their pin. */
+window.locate = name => {
+  if(!MAP) return;
+  const p = mapPlayers().find(q => q.name === name);
+  if(!p) return;
+  document.querySelector(".mapwrap").scrollIntoView({block:"center", behavior:"smooth"});
+  MAP.setView(worldToLatLng(p.pos.x, p.pos.y), Math.max(MAP.getZoom(), 5), {animate:true});
+  setTimeout(() => {
+    for(const [k, m] of PINS) if(k.split("|").includes(name)) m.openPopup();
+  }, 450);
+};
+
+/* ---------- who is online ---------- */
+function since(secs){
+  if(secs < 60) return "just joined";
+  const d = Math.floor(secs/86400), h = Math.floor(secs%86400/3600), m = Math.floor(secs%3600/60);
+  return "on for " + (d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`);
+}
+
+function drawOnline(){
+  const s = LIVE.server || {}, list = LIVE.online || [];
+  const pill = document.getElementById("livepill");
+  pill.className = "pill" + (s.online ? "" : " off");
+  document.getElementById("livetitle").textContent = !s.online
+    ? "Server offline"
+    : list.length ? `Online now — ${list.length} survivor${list.length===1?"":"s"}`
+                  : "Online now";
+
+  const box = document.getElementById("onlinelist");
+  if(!s.online){ box.innerHTML = '<p class="none">The server is down right now.</p>'; return; }
+  if(!list.length){
+    box.innerHTML = '<p class="none">Nobody in Knox County right now — the server is up and waiting.</p>';
+    return;
+  }
+  const by = Object.fromEntries((DATA?.players || []).map(p => [p.name, p]));
+  box.innerHTML = '<div class="online">' + list.map(o => {
+    const p = by[o.name] || {};
+    return `<button class="pchip" type="button" onclick="locate('${esc(o.name)}')" title="show on the map">
+      <span class="ava on">${p.avatar || ""}</span>
+      <span><b>${esc(o.name)}</b><span class="t">${since(o.secs)}</span></span></button>`;
+  }).join("") + "</div>";
+}
+
+/* ---------- sessions by hour ---------- */
+function drawHours(d){
+  const hrs = (d.world||{}).activity_by_hour || [];
+  const max = Math.max(...hrs, 1);
+  const now = new Date().getHours();
+  document.getElementById("hours").innerHTML = hrs.map((v,i)=>
+    `<div class="${i===now?"on":""}" style="height:${Math.max(2, Math.round(100*v/max))}%" data-t="${i}:00 — ${v} session${v===1?"":"s"}"></div>`).join("");
+  document.getElementById("hourlabels").innerHTML =
+    hrs.map((_,i)=> `<span>${i%6===0?i:""}</span>`).join("");
+}
+
+/* ---------- table ---------- */
+function detailRow(p){
+  const skills = Object.entries(p.skills||{}).map(([k,v])=>`<span class="skill">${esc(k)} <b>${v}</b></span>`).join("") || "—";
+  const fit = (p.outfit_full||p.outfit||[]).map(esc).join(" · ") || "—";
+  const pos = p.pos ? `${fmt(p.pos.x)}, ${fmt(p.pos.y)}${p.pos.dead?" · dead":" · alive"}` : "unknown";
+  return `<tr class="detail"><td colspan="6"><div class="dgrid">
+    <div class="dbox"><span class="dk">Position</span><div class="dv">${pos}</div></div>
+    <div class="dbox"><span class="dk">Sessions</span><div class="dv">${fmt(p.sessions)} · ${p.playtime_hours}h played</div></div>
+    <div class="dbox"><span class="dk">Survived</span><div class="dv">${fmt(p.hours_survived)} in-game hours</div></div>
+    <div class="dbox" style="grid-column:1/-1"><span class="dk">Wearing</span><div class="dv">${esc(fit)}</div></div>
+    <div class="dbox" style="grid-column:1/-1"><span class="dk">All skills</span><div class="sk">${skills}</div></div>
+  </div></td></tr>`;
+}
+
+function drawTable(){
+  const ps = [...(DATA.players||[])].sort((a,b)=>{
+    const A=a[sortKey], B=b[sortKey];
+    if(typeof A === "string") return sortDir * A.localeCompare(B);
+    return sortDir * ((A||0) - (B||0));
+  });
+  const max = Math.max(...ps.map(p=>p.playtime_hours), 1);
+  document.getElementById("rows").innerHTML = ps.map(p=>{
     const pct = Math.round(100*p.playtime_hours/max);
-    return `<tr>
-      <td class="av" title="${(p.outfit||[]).join(' · ')}">${p.avatar||""}</td>
-      <td><span class="who">${p.name}</span>
-          <div class="fit">${(p.outfit||[]).slice(0,3).join(' · ')}</div>
+    const sk = Object.entries(p.skills||{}).slice(0,6)
+      .map(([k,v])=>`<span class="skill">${esc(k)} <b>${v}</b></span>`).join("") || '<span class="skill">none yet</span>';
+    const row = `<tr class="row" data-n="${esc(p.name)}" onclick="toggleRow('${esc(p.name)}')">
+      <td class="av" title="${esc((p.outfit||[]).join(' · '))}"><span class="ava${
+        ONLINE.has(p.name)?" on":""}${p.pos&&p.pos.dead?" dead":""}">${p.avatar||""}</span></td>
+      <td><span class="who">${esc(p.name)}</span>
+          <div class="fit">${esc((p.outfit||[]).slice(0,3).join(' · '))}</div>
           <div class="bar"><i style="width:${pct}%"></i></div></td>
       <td class="num">${p.playtime_hours}h</td>
-      <td class="num">${p.hours_survived}h</td>
-      <td class="num">${p.sessions}</td>
-      <td><div class="skills">${sk}</div></td>
-    </tr>`;
+      <td class="num">${fmt(p.hours_survived)}h</td>
+      <td class="num">${fmt(p.sessions)}</td>
+      <td><div class="skills">${sk}</div></td></tr>`;
+    return row + (openRow===p.name ? detailRow(p) : "");
   }).join("") || '<tr><td colspan="6">nobody has played yet</td></tr>';
+
+  document.querySelectorAll("thead th.s").forEach(th=>{
+    th.classList.remove("asc","desc");
+    if(th.dataset.k===sortKey) th.classList.add(sortDir===1?"asc":"desc");
+  });
+}
+
+window.toggleRow = name => { openRow = (openRow===name ? null : name); drawTable(); };
+window.focusPlayer = name => {
+  openRow = name; drawTable();
+  const r = document.querySelector(`tr.row[data-n="${CSS.escape(name)}"]`);
+  if(r) r.scrollIntoView({block:"center", behavior:"smooth"});
+};
+
+document.addEventListener("click", e=>{
+  const th = e.target.closest("thead th.s");
+  if(!th) return;
+  const k = th.dataset.k;
+  if(sortKey===k) sortDir = -sortDir; else { sortKey = k; sortDir = (k==="name") ? 1 : -1; }
+  drawTable();
+});
+
+/* ---------- render ---------- */
+function render(d){
+  DATA = d;
+  const w = d.world||{};
+  const top = [...(d.players||[])].sort((a,b)=>b.hours_survived-a.hours_survived)[0];
+  document.getElementById("cards").innerHTML = [
+    card("Online now", '<span id="cnow">—</span>', '<span id="cslots"></span>'),
+    card("Survivors", fmt((d.players||[]).length), "characters made"),
+    card("Total playtime", `${fmt(w.combined_playtime_hours)}h`, "across everyone"),
+    card("Longest survival", top?`${fmt(top.hours_survived)}h`:"—", top?top.name:""),
+    card("Map data", fmt(w.chunks), "chunk files written")
+  ].join("");
+
+  if(!MAP) initMap();
+  drawHours(d); drawLive();
 
   const when = d.generated ? new Date(d.generated) : null;
   document.getElementById("foot").textContent =
-    "updated " + (when ? when.toLocaleString() : "—") + " · refreshes every 60s";
+    "stats updated " + (when?when.toLocaleString():"—") + " · who's online refreshes every 10s";
 }
 
-async function tick(){
+const ago = iso => {
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  return m < 1 ? "just now" : m === 1 ? "1 min ago" : m + " min ago";
+};
+
+/* Everything that changes between stats refreshes: presence, positions, count. */
+function drawLive(){
+  const s = LIVE.server || {};
+  document.getElementById("dot").className = "dot " + (s.online ? "up":"down");
+  document.getElementById("statusText").textContent = s.online
+    ? `online — ${s.players}/${s.max} playing right now` : "offline";
+  const now = document.getElementById("cnow"), slots = document.getElementById("cslots");
+  if(now){ now.textContent = s.online ? s.players : "—";
+           slots.textContent = s.online ? `of ${s.max} slots` : "server down"; }
+  const age = document.getElementById("posage");
+  if(age) age.textContent = LIVE.positions_saved
+    ? "positions written by the server " + ago(LIVE.positions_saved) : "";
+  drawOnline(); syncMap();
+  const key = [...ONLINE].sort().join("|");
+  if(DATA && drawLive.key !== key){ drawLive.key = key; drawTable(); }
+}
+
+async function grab(url){
+  const r = await fetch(url + "?t=" + Date.now(), {cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+async function tickLive(){
   try{
-    const r = await fetch("stats.json?t=" + Date.now(), {cache:"no-store"});
-    if(!r.ok) throw new Error("HTTP " + r.status);
-    render(await r.json());
+    LIVE = await grab("live.json");
+    ONLINE = new Set((LIVE.online||[]).map(o => o.name));
+    drawLive();
+  }catch(e){ /* a missed live poll is not worth a visible error */ }
+}
+
+async function tickStats(){
+  try{
+    render(await grab("stats.json"));
   }catch(e){
     document.getElementById("foot").innerHTML =
-      '<span class="err">could not load stats (' + e.message + ')</span>';
+      '<span class="err">could not load stats ('+e.message+')</span>';
   }
 }
-tick();
-setInterval(tick, 60000);
+
+tickLive().then(tickStats);
+setInterval(tickLive, 10000);
+setInterval(tickStats, 60000);
 </script>
 </body>
 </html>

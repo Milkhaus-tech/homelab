@@ -70,10 +70,10 @@ def banner(y=0, h=4):
             "gridPos": {"x": 0, "y": y, "w": 24, "h": h},
             "options": {"mode": "html", "content": BANNER_HTML}}
 
-NL = 'instance="192.168.1.10:9100"'
-ND = 'instance="192.168.1.13:9100"'
-NJ = 'instance="192.168.1.11:9100"'  # Jesus — miner, back online
-NP = 'instance="192.168.1.12:9100"'  # Pablo — miner, back online
+NL = 'instance="192.168.1.210:9100"'
+ND = 'instance="192.168.1.213:9100"'
+NJ = 'instance="192.168.1.211:9100"'  # Jesus — panel/monitoring/frigate node
+NP = 'instance="192.168.1.212:9100"'  # Pablo — Minecraft node
 
 # tile label -> promql selector inside container_last_seen{...}
 # game servers matched by wings label + image so tiles survive delete/recreate (new UUID)
@@ -87,7 +87,7 @@ CONTAINERS = [
     ("prowlarr", 'name="prowlarr"'), ("bazarr", 'name="bazarr"'),
     ("autobrr", 'name="autobrr"'),
     ("pterodactyl", 'name="pterodactyl-panel-1"'),
-    ("CS2 server", 'container_label_Service="Pterodactyl",image=~".*cs2.*"'),
+    ("PZ server", 'container_label_Service="Pterodactyl",image=~".*steamcmd.*"'),
     ("Factorio server", 'container_label_Service="Pterodactyl",image=~".*yolks.*"'),
     ("discord bot", 'name="milkhaus-discord-bot"'),
     ("fantasy backend", 'name="fantasy-football-backend"'),
@@ -105,8 +105,8 @@ panels = [
 
     bigstat("Noahlab (server)", f'up{{{NL}}}', ONOFF, 0, 4, w=4),
     bigstat("Noah Desktop", f'up{{{ND}}}', ONOFF, 4, 4, w=4),
-    bigstat("Jesus (miner)", f'up{{{NJ}}}', ONOFF, 8, 4, w=4),
-    bigstat("Pablo (miner)", f'up{{{NP}}}', ONOFF, 12, 4, w=4),
+    bigstat("Jesus (node 2)", f'up{{{NJ}}}', ONOFF, 8, 4, w=4),
+    bigstat("Pablo (node 3)", f'up{{{NP}}}', ONOFF, 12, 4, w=4),
     countstat("Problems (targets down)", "count(up == 0) or vector(0)", "16", 4, problems, w=4),
     countstat("Containers running", 'count(container_last_seen{name!=""})', "20", 4, plain, w=4, fixed=TETO),
 
@@ -117,7 +117,7 @@ panels = [
     usage("Desktop CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{ND}}}[5m])) * 100)', "percent", 16, 9, pct, h=4),
     usage("Desktop RAM", f'(1 - node_memory_MemAvailable_bytes{{{ND}}} / node_memory_MemTotal_bytes{{{ND}}}) * 100', "percent", 20, 9, pct, h=4),
 
-    # Miner row — temp gets its own tile: heat is why these two get powered off
+    # Node row — temp tiles kept: these boxes throttle first in summer heat
     usage("Jesus CPU", f'100 - (avg(rate(node_cpu_seconds_total{{mode="idle",{NJ}}}[5m])) * 100)', "percent", 0, 13, pct, h=4),
     usage("Jesus RAM", f'(1 - node_memory_MemAvailable_bytes{{{NJ}}} / node_memory_MemTotal_bytes{{{NJ}}}) * 100', "percent", 4, 13, pct, h=4),
     usage("Jesus temp", f'max(node_hwmon_temp_celsius{{{NJ}}})', "celsius", 8, 13, tempth, h=4),
@@ -126,8 +126,8 @@ panels = [
     usage("Pablo temp", f'max(node_hwmon_temp_celsius{{{NP}}})', "celsius", 20, 13, tempth, h=4),
 
     # Home Assistant row
-    usage("House temp", 'homeassistant_climate_current_temperature_celsius', "celsius",
-          0, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 27}, {"color": "red", "value": 30}], h=4),
+    usage("House temp", 'homeassistant_climate_current_temperature_celsius * 9/5 + 32', "fahrenheit",
+          0, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 81}, {"color": "red", "value": 86}], h=4),
     usage("House humidity", 'homeassistant_sensor_humidity_percent', "percent",
           4, 17, [{"color": "green", "value": None}, {"color": "yellow", "value": 60}, {"color": "red", "value": 70}], h=4),
     usage("Lights on", 'count(homeassistant_light_brightness_percent > 0) or vector(0)', "none",

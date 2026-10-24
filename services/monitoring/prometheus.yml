@@ -5,34 +5,66 @@ scrape_configs:
   - job_name: 'node_stats'
     static_configs:
       - targets:
-          - '192.168.1.10:9100'  # Noahlab
-          - '192.168.1.11:9100'  # Jesus
-          - '192.168.1.12:9100'  # Pablo
-          - '192.168.1.13:9100'  # Noah Desktop
+          - '192.168.1.210:9100'  # Noahlab
+          - '192.168.1.211:9100'  # Jesus
+          - '192.168.1.212:9100'  # Pablo
+          - '192.168.1.213:9100'  # Noah Desktop
 
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['192.168.1.10:8098']
+      - targets: ['192.168.1.210:8098', '192.168.1.211:8098']
 
   - job_name: 'exportarr'
     static_configs:
       - targets:
-          - '192.168.1.10:9707'  # sonarr
-          - '192.168.1.10:9708'  # radarr
-          - '192.168.1.10:9709'  # prowlarr
+          - '192.168.1.210:9707'  # sonarr
+          - '192.168.1.210:9708'  # radarr
+          - '192.168.1.210:9709'  # prowlarr
 
   - job_name: 'jellyfin'
     static_configs:
-      - targets: ['192.168.1.10:8096']
+      - targets: ['192.168.1.210:8096']
 
   - job_name: 'frigate'
     metrics_path: /api/metrics
     static_configs:
-      - targets: ['192.168.1.10:5000']
+      - targets: ['192.168.1.211:5000']
 
   - job_name: 'homeassistant'
     metrics_path: /api/prometheus
     authorization:
       credentials_file: /etc/prometheus/ha_token
     static_configs:
-      - targets: ['192.168.1.10:8123']
+      - targets: ['192.168.1.210:8123']
+
+  # Public sites for the Westly Lab page uptime; keep in step with the check.http URLs in ~/westly/lab.json
+  - job_name: 'sites'
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'https://milkhaus.net/'
+          - 'https://stream.milkhaus.net/'
+          - 'https://request.milkhaus.net/'
+          - 'https://join.milkhaus.net/my/account'
+          - 'https://panel.milkhaus.net/'
+          - 'https://files.milkhaus.net/'
+          - 'https://pz.milkhaus.net/'
+          - 'https://mc.milkhaus.net/'
+          - 'https://ig.milkhaus.net/'
+          - 'https://x.milkhaus.net/'
+          - 'https://test.milkhaus.net/photography/'
+          - 'https://stats.milkhaus.net/'
+          - 'https://goodnod.milkhaus.net/healthz'
+          - 'https://mundusnet.milkhaus.net/'
+          - 'https://davidsonstechservices.com/'
+          - 'https://stevedavisphoto.com/'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9115

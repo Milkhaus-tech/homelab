@@ -5,33 +5,141 @@
 # and cannot start a browser on the desktop. Runs every minute from a systemd timer: a draft
 # can be closer than the five-minute lead the first time it is seen, since joining a public
 # league starts one about two minutes later.
+#
+# Every failure says so on stdout (the journal keeps it) and a failed WAKE also pages Noah:
+# a war room that never came up is a draft nobody is driving, and the phone is his last
+# chance to open the room by hand. Routine "not wanted" ticks stay silent.
 set -u
 
 API="${AUDIBLE_URL:-http://localhost:8888}"
 ENV_FILE="$HOME/.config/audible/agent-warroom.env"
+LOCK="/tmp/audible-warroom.lock"
+ALERT_STAMP="/tmp/audible-warroom.alerted"
+ALERT_QUIET=600   # seconds between pushes: the wake retries every minute for a whole draft
 
-decision=$(curl -s --max-time 10 "$API/api/war-room") || exit 0
+log() { printf '%s\n' "$*"; }
+
+alert() {
+    now=$(date +%s)
+    last=0
+    if [ -f "$ALERT_STAMP" ]; then
+        last=$(tr -cd '0-9' < "$ALERT_STAMP")
+        last=${last:-0}
+    fi
+    if [ "$((now - last))" -ge "$ALERT_QUIET" ]; then
+        printf '%s' "$now" > "$ALERT_STAMP"
+        /home/noah/bin/vd-flag "$1" >/dev/null 2>&1 || \
+            log "vd-flag push FAILED — Noah was not notified: $1"
+    fi
+}
+
+# One reconcile at a time. Chromium needs ~15s before it answers on the DevTools port, and
+# this runs every minute: the next tick saw "not awake", launched a second Chromium against
+# the same profile, and the two fought over the singleton lock until neither survived. The
+# war room came up and died in a loop for four minutes straight while being asked to be
+# ready for a draft.
+exec 9>"$LOCK"
+flock -n 9 || exit 0
+# The lock FD must not leak into children: Chromium inherited it once and held it for the
+# war room's whole life, so no later tick could reconcile anything — including teardown.
+
+
+decision=$(curl -s --max-time 10 "$API/api/war-room") || {
+    log "war room NOT reconciled: $API/api/war-room is unreachable"
+    exit 0
+}
 wanted=$(printf '%s' "$decision" | python3 -c "import json,sys;print(json.load(sys.stdin).get('wanted'))" 2>/dev/null)
 league=$(printf '%s' "$decision" | python3 -c "import json,sys;print(json.load(sys.stdin).get('league_id') or '')" 2>/dev/null)
+if [ "$wanted" != "True" ] && [ "$wanted" != "False" ]; then
+    # An HTTP error carries a body, so curl still succeeds. Left to fall through, that read
+    # as "not wanted" and tore down a live war room mid-draft.
+    log "war room NOT reconciled: unreadable answer from $API/api/war-room: ${decision:0:200}"
+    exit 0
+fi
 awake=no
 curl -s --max-time 2 http://127.0.0.1:9312/json/version >/dev/null && awake=yes
 
-if [ "$wanted" = "True" ] && [ "$awake" = "no" ]; then
-    echo "waking the war room for league $league"
+agent_up=no
+systemctl --user is-active --quiet audible-agent@warroom.service && agent_up=yes
+
+# Which league the running agent is actually working. A war room already awake for one
+# league is not a war room for the next: the env is only rewritten below when the desktop
+# is asleep, so a league whose draft had just finished held the room — and the agent — while
+# the real draft's wake window opened. Live on 2026-08-15.
+bound=""
+[ -f "$ENV_FILE" ] && bound=$(sed -n 's/^VD_LEAGUE_ID=//p' "$ENV_FILE")
+
+if [ "$wanted" = "True" ] && [ "$awake" = "yes" ] && [ "$bound" != "$league" ]; then
+    log "war room is bound to league ${bound:-none} but ${league} needs it — re-targeting"
     mkdir -p "$(dirname "$ENV_FILE")"
-    cat > "$ENV_FILE" <<ENV
+    if cat > "$ENV_FILE" <<ENV
 VD_CDP_URL=http://127.0.0.1:9312
 VD_DESK=warroom
 DISPLAY=:12
 VD_LEAGUE_ID=${league}
 ENV
-    /home/noah/bin/vd-desktop start warroom
-    systemctl --user enable --now audible-agent@warroom.service 2>/dev/null
-    systemctl --user restart audible-agent@warroom.service
-    /home/noah/bin/vd-flag "Audible war room is up — real draft for league ${league} starting" \
-        >/dev/null 2>&1 || true
-elif [ "$wanted" != "True" ] && [ "$awake" = "yes" ]; then
-    echo "standing the war room down"
-    systemctl --user disable --now audible-agent@warroom.service 2>/dev/null
-    /home/noah/bin/vd-desktop stop warroom
+    then
+        systemctl --user restart audible-agent@warroom.service 9>&- || {
+            log "could not restart the war-room agent onto league ${league}"
+            alert "Audible war room is stuck on league ${bound} while ${league} drafts — the draft needs you"
+        }
+    else
+        log "could not rewrite $ENV_FILE to league ${league}"
+        alert "Audible war room: cannot retarget to league ${league} — the draft needs you"
+    fi
+    rm -f "$ALERT_STAMP"
+    exit 0
 fi
+
+if [ "$wanted" = "True" ]; then
+    # Reconcile both halves every tick, not just the first. Keyed only on the browser, a
+    # war room whose agent had died sat awake with nothing driving it — the desktop was up,
+    # so this did nothing, and the draft would have gone to ESPN's autopick in silence.
+    if [ "$awake" = "no" ]; then
+        log "waking the war room for league $league"
+        mkdir -p "$(dirname "$ENV_FILE")"
+        cat > "$ENV_FILE" <<ENV || {
+VD_CDP_URL=http://127.0.0.1:9312
+VD_DESK=warroom
+DISPLAY=:12
+VD_LEAGUE_ID=${league}
+ENV
+            log "could not write $ENV_FILE — the war-room agent has no league to work"
+            alert "Audible war room: cannot write $ENV_FILE for league ${league} — the draft needs you"
+            exit 0
+        }
+        if ! /home/noah/bin/vd-desktop start warroom 9>&-; then
+            log "vd-desktop start warroom FAILED — no browser for league $league's draft"
+            alert "Audible war room FAILED to start for league ${league} — open the ESPN draft room by hand"
+            exit 0
+        fi
+        /home/noah/bin/vd-flag "Audible war room is up — real draft for league ${league} starting" \
+            >/dev/null 2>&1 || log "vd-flag push FAILED — no 'war room is up' notice was sent"
+    fi
+    if [ "$agent_up" = "no" ]; then
+        log "starting the war-room agent for league $league"
+        systemctl --user enable --now audible-agent@warroom.service 2>/dev/null 9>&-
+        if ! systemctl --user restart audible-agent@warroom.service 9>&-; then
+            log "audible-agent@warroom.service FAILED to start — nothing will drive the draft"
+            alert "Audible war-room agent FAILED for league ${league} — the draft room has no hands"
+            exit 0
+        fi
+    fi
+else
+    # Both halves again, and unconditionally. Keyed on the browser being up, a war room that
+    # was not wanted but whose agent was still restarting on a dead desktop was left alone —
+    # Restart=always meant it looped forever against a DevTools port with nothing behind it.
+    if [ "$agent_up" = "yes" ]; then
+        log "standing the war-room agent down"
+        systemctl --user disable --now audible-agent@warroom.service 2>/dev/null || \
+            log "could not disable audible-agent@warroom.service — it may keep restarting"
+    fi
+    if [ "$awake" = "yes" ]; then
+        log "standing the war room down"
+        /home/noah/bin/vd-desktop stop warroom 9>&- || \
+            log "vd-desktop stop warroom FAILED — display :12 is still holding memory"
+    fi
+fi
+
+# Reached only when nothing failed, so the next failure pages immediately.
+rm -f "$ALERT_STAMP"
