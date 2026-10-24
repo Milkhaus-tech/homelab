@@ -6,4 +6,7 @@ systemctl --user restart sunshine.service &
 # Teto desktop: restore the wallpaper (minimal XFCE has no xfdesktop to do it).
 [ -x "$HOME/.fehbg" ] && "$HOME/.fehbg" &
 
+# Agent-facing Chromium (CDP 9222) must survive reboots; idempotent, self-backgrounds.
+"$HOME/bin/vd-browser" &
+
 exec startxfce4

@@ -1,6 +1,7 @@
 - id: '1781741606110'
   alias: Away on Leave
-  description: Sets ecobee to away comfort state when everyone leaves the house
+  description: Sets ecobee to away comfort state when everyone leaves the house. Clear-hold
+    precedes the write; the ecobee silently ignores mode writes while a hold is active.
   triggers:
   - trigger: zone.left
     target:
@@ -41,6 +42,11 @@
       for: 00:00:00
       zone: zone.home
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
@@ -49,7 +55,8 @@
   mode: single
 - id: '1781741845560'
   alias: 'Cool on home '
-  description: ''
+  description: Clear-hold precedes the write; the ecobee silently ignores mode writes
+    while a hold is active.
   triggers:
   - trigger: zone.left
     target:
@@ -92,6 +99,11 @@
     - sun
     - sat
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
@@ -100,7 +112,8 @@
   mode: single
 - id: '1781742505038'
   alias: 1 1/2 Hour Precool
-  description: ''
+  description: Precool to sleep comfort ahead of the 18:00 peak. Clear-hold precedes
+    the write; the ecobee silently ignores mode writes while a hold is active.
   triggers:
   - trigger: time
     at: '16:30:00'
@@ -114,6 +127,11 @@
     - sun
   conditions: []
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
@@ -122,7 +140,8 @@
   mode: single
 - id: '1781742677869'
   alias: Away if Not Home @ 9PM
-  description: ''
+  description: Clear-hold precedes the write; the ecobee silently ignores mode writes
+    while a hold is active.
   triggers:
   - trigger: time
     at: '21:01:00'
@@ -148,41 +167,16 @@
       for: 00:00:00
       zone: zone.home
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
     type: select_option
     option: away
-  mode: single
-- id: '1781772442517'
-  alias: On when Arrive Home
-  description: ''
-  triggers:
-  - trigger: zone.entered
-    target:
-      entity_id: person.noah
-    options:
-      for: 00:00:00
-      zone: zone.home
-  - trigger: zone.entered
-    target:
-      entity_id: person.partner
-    options:
-      for: 00:00:00
-      zone: zone.home
-  conditions: []
-  actions:
-  - type: turn_on
-    device_id: c2f4e48d6cd0b16b7477b1c30ded36cf
-    entity_id: 043301e77c9cf9e6ff894251f1e391fa
-    domain: remote
-  - action: light.turn_on
-    metadata: {}
-    target:
-      area_id:
-      - kitchen
-      - living_room
-    data: {}
   mode: single
 - id: '1781772601696'
   alias: Lights off Sunrise
@@ -205,7 +199,10 @@
   alias: Check if Away
   description: Polls every 15s so an away transition still happens if the zone trigger
     is missed. The "not already away" condition is what stops it re-sending on every
-    tick and overriding a manual thermostat change.
+    tick and overriding a manual thermostat change. Runs through the 18:00-21:00 peak
+    so device-side flips to home in an empty house get corrected; only the 16:30-18:00
+    precool window is excluded. Clear-hold precedes the write; the ecobee silently
+    ignores mode writes while a hold is active.
   triggers:
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
@@ -237,17 +234,6 @@
       for: 00:00:00
       zone: zone.home
   - condition: time
-    after: '21:00:00'
-    before: '18:00:00'
-    weekday:
-    - mon
-    - tue
-    - wed
-    - thu
-    - fri
-    - sun
-    - sat
-  - condition: time
     after: '17:59:00'
     before: '16:30:00'
     weekday:
@@ -267,79 +253,30 @@
       type: selected_option
       option: away
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
     type: select_option
     option: away
-  mode: single
-- id: '1781854735117'
-  alias: Morning Water
-  description: ''
-  triggers:
-  - trigger: time
-    at: 06:00:00
-    weekday:
-    - sun
-    - tue
-    - mon
-    - wed
-    - thu
-    - fri
-    - sat
-  conditions: []
-  actions:
-  - action: switch.turn_on
-    target:
-      entity_id: switch.backyard_tp_link_smart_plug_pump_1
-    data: {}
-  - delay:
-      hours: 0
-      minutes: 2
-      seconds: 0
-      milliseconds: 0
-  - action: switch.turn_off
-    target:
+  - wait_for_trigger:
+    - trigger: state
       entity_id:
-      - switch.backyard_tp_link_smart_plug_pump_1
-    data: {}
-  mode: single
-- id: '1781854907075'
-  alias: Recovery Water
-  description: ''
-  triggers:
-  - trigger: time
-    at: '19:30:00'
-    weekday:
-    - sun
-    - tue
-    - mon
-    - wed
-    - thu
-    - fri
-    - sat
-  conditions: []
-  actions:
-  - action: switch.turn_on
-    target:
-      entity_id: switch.backyard_tp_link_smart_plug_pump_1
-    data: {}
-  - delay:
-      hours: 0
-      minutes: 2
-      seconds: 0
-      milliseconds: 0
-  - action: switch.turn_off
-    target:
-      entity_id:
-      - switch.backyard_tp_link_smart_plug_pump_1
-    data: {}
+      - select.kitchen_thermostat_current_mode
+      to: away
+    timeout:
+      seconds: 90
   mode: single
 - id: '1782123219661'
   alias: Check if Home
   description: Recovery poller for a missed home transition. Weekday list must stay
     in sync with "Check if Away" — when this ran mon-fri only, an away state set on
-    Friday night persisted all weekend.
+    Friday night persisted all weekend. Clear-hold precedes the write; the ecobee
+    silently ignores mode writes while a hold is active.
   triggers:
   - trigger: time_pattern
     seconds: /30
@@ -371,39 +308,23 @@
     type: selected_option
     option: away
   actions:
+  - action: button.press
+    target:
+      entity_id: button.kitchen_thermostat_clear_hold
+  - delay:
+      seconds: 20
   - device_id: 9bd7df2aa66155f9449e04ca66efb33b
     domain: select
     entity_id: b23294749e4bc20810123958161f04ed
     type: select_option
     option: home
-  mode: single
-- id: pump_failsafe_off
-  alias: Pump failsafe off
-  description: Backstop for Morning Water and Recovery Water. Their 2-minute delay
-    lives in memory, so a restart or reload mid-run drops the turn_off and leaves the
-    pump running indefinitely. The start trigger catches a pump already on when HA
-    comes back; the 5-minute state trigger catches every other way it gets stuck,
-    including a manual turn-on that is never turned off.
-  triggers:
-  - trigger: state
-    entity_id:
-    - switch.backyard_tp_link_smart_plug_pump_1
-    to: 'on'
-    for:
-      hours: 0
-      minutes: 5
-      seconds: 0
-  - trigger: homeassistant
-    event: start
-  conditions:
-  - condition: state
-    entity_id: switch.backyard_tp_link_smart_plug_pump_1
-    state: 'on'
-  actions:
-  - action: switch.turn_off
-    target:
-      entity_id: switch.backyard_tp_link_smart_plug_pump_1
-    data: {}
+  - wait_for_trigger:
+    - trigger: state
+      entity_id:
+      - select.kitchen_thermostat_current_mode
+      to: home
+    timeout:
+      seconds: 90
   mode: single
 - id: doorbell_simple_record
   alias: D205 Record on Wake
@@ -445,7 +366,8 @@
   max: 5
 - id: donetick_chore_notifications
   alias: 'Chore Chart: Donetick notifications'
-  description: Relays Donetick chore webhook events (reminders and completions) to phones
+  description: Relays Donetick chore webhooks to partner's phone only; Noah's chore notifications
+    go through Westly
   triggers:
   - trigger: webhook
     webhook_id: <redacted>
@@ -457,43 +379,210 @@
   - choose:
     - conditions:
       - condition: template
-        value_template: "{{ trigger.json.type == 'task.reminder' }}"
+        value_template: '{{ trigger.json.type == ''task.reminder'' and trigger.json.data.assignee_username
+          == ''partner'' }}'
       sequence:
-      - action: notify.mobile_app_{{ 'partner_iphone' if trigger.json.data.assignee_username == 'partner' else 'apple_square_v2' }}
+      - action: notify.mobile_app_partner_iphone
         data:
-          title: "{{ {'pre_due': 'Chore coming up', 'due': 'Chore due', 'overdue': 'Chore overdue'}.get(trigger.json.data.type, 'Chore reminder') }}"
+          title: '{{ {''pre_due'': ''Chore coming up'', ''due'': ''Chore due'', ''overdue'':
+            ''Chore overdue''}.get(trigger.json.data.type, ''Chore reminder'') }}'
           message: '{{ trigger.json.data.name }}'
           data:
             url: http://192.168.1.10:2021/chores
     - conditions:
       - condition: template
-        value_template: "{{ trigger.json.type == 'task.completed' }}"
+        value_template: '{{ trigger.json.type == ''task.completed'' and trigger.json.data.username
+          == ''noah'' }}'
       sequence:
-      - action: notify.mobile_app_{{ 'partner_iphone' if trigger.json.data.username == 'noah' else 'apple_square_v2' }}
+      - action: notify.mobile_app_partner_iphone
         data:
           title: Chore done ✓
-          message: '{{ trigger.json.data.display_name }} finished: {{ trigger.json.data.chore.name }}'
+          message: '{{ trigger.json.data.display_name }} finished: {{ trigger.json.data.chore.name
+            }}'
           data:
             url: http://192.168.1.10:2021/chores
   mode: queued
   max: 10
-- id: vd_attention
-  alias: 'Virtual desktop: needs attention'
-  description: Relays vd-flag webhooks (agent blocked on login/2FA/captcha) to Noah's phone
+- id: tv_search_passthrough
+  alias: TV keyboard passthrough
+  description: Type text entered in input_text.tv_search_query into the Fire TV's
+    focused field, then clear the box
+  trigger:
+  - platform: state
+    entity_id: input_text.tv_search_query
+  condition:
+  - condition: template
+    value_template: '{{ trigger.to_state.state | trim != '''' }}'
+  action:
+  - action: script.tv_type
+    data:
+      text: '{{ trigger.to_state.state }}'
+  - delay:
+      seconds: 1
+  - action: input_text.set_value
+    target:
+      entity_id: input_text.tv_search_query
+    data:
+      value: ''
+  mode: queued
+- id: downstairs_presence_lights
+  alias: 'Downstairs: lights follow presence'
+  description: Lights on when a person appears, they are off and the sun is low; off
+    after 10 min of vacancy. Suspended while the TV is playing/paused; re-evaluated
+    30 s after playback ends.
   triggers:
-  - trigger: webhook
-    webhook_id: <redacted>
-    allowed_methods:
-    - POST
-    local_only: true
+  - trigger: state
+    entity_id: binary_sensor.downstairs_person
+    to: 'on'
+    id: enter
+  - trigger: state
+    entity_id: binary_sensor.downstairs_person
+    to: 'off'
+    for: '00:10:00'
+    id: leave
+  - trigger: state
+    entity_id: sensor.living_room_jellyfin_playback
+    to: idle
+    for: '00:00:30'
+    id: playback_ended
+  conditions:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: sensor.living_room_jellyfin_playback
+      state:
+      - playing
+      - paused
+  actions:
+  - variables:
+      lit: "{{ expand('light.downstairs_lights') | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}"
+      # auto-on only when the sun is this low (degrees); ~1 h before sunset here. Raise if the room is dim earlier.
+      dark_below_elevation: 10
+  - choose:
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id == ''leave'' }}'
+      sequence:
+      - action: light.turn_off
+        target:
+          entity_id: light.downstairs_lights
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id == ''playback_ended'' }}'
+      - condition: state
+        entity_id: binary_sensor.downstairs_person
+        state: 'off'
+        for: '00:10:00'
+      sequence:
+      - action: light.turn_off
+        target:
+          entity_id: light.downstairs_lights
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id == ''playback_ended'' }}'
+      - condition: template
+        value_template: '{{ lit | count > 0 }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: '{{ lit }}'
+        data:
+          brightness_pct: 100
+          transition: 2
+    - conditions:
+      - condition: template
+        value_template: '{{ trigger.id in [''enter'', ''playback_ended''] }}'
+      - condition: state
+        entity_id: binary_sensor.downstairs_person
+        state: 'on'
+      - condition: state
+        entity_id: light.downstairs_lights
+        state: 'off'
+      - condition: template
+        value_template: '{{ state_attr(''sun.sun'', ''elevation'') | float(0) < dark_below_elevation }}'
+      sequence:
+      - action: light.turn_on
+        target:
+          entity_id: light.downstairs_lights
+        data:
+          brightness_pct: 100
+  mode: restart
+- id: downstairs_jellyfin_dims_lights
+  alias: 'Downstairs: dim lights for Jellyfin'
+  description: Fire TV Jellyfin session - playing 1%, paused (>10 s) 15%. Only
+    touches bulbs that are already on; restoring to 100% when playback ends lives
+    in the presence automation.
+  triggers:
+  - trigger: state
+    entity_id: sensor.living_room_jellyfin_playback
+    to: playing
+  - trigger: state
+    entity_id: sensor.living_room_jellyfin_playback
+    to: paused
+    for: '00:00:10'
+  - trigger: state  # Govee LAN bulbs drop off and rejoin; re-apply the level when one comes back
+    entity_id: [light.kitchen1_local, light.kitchen2_local, light.kitchen3_local, light.kitchen4_local,
+      light.living_room_living_room_1, light.living_room_living_room_2, light.living_room_living_room_3, light.living_room_living_room_4]
+    from: unavailable
+    for: '00:00:05'
+    id: bulb_back
+  conditions:
+  - condition: template
+    value_template: >-
+      {{ is_state('sensor.living_room_jellyfin_playback', ['playing', 'paused']) if trigger.id == 'bulb_back'
+         else trigger.from_state.state in ['playing', 'paused', 'idle'] }}
+  actions:
+  - variables:
+      levels:
+        playing: 1
+        paused: 15
+      lit: "{{ expand('light.downstairs_lights') | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}"
+  - condition: template
+    value_template: '{{ lit | count > 0 }}'
+  - action: light.turn_on
+    target:
+      entity_id: '{{ lit }}'
+    data:
+      brightness_pct: "{{ levels[states('sensor.living_room_jellyfin_playback')] }}"
+      transition: 3
+  mode: restart
+- id: ipad_panel_brightness_follows_presence
+  alias: 'iPad panel: screen follows presence'
+  description: >-
+    Kiosk iPad wakes when someone is downstairs and Jellyfin is not playing; shows the kiosk
+    screensaver after 5 min of vacancy or while Jellyfin plays. Screensaver mode/dim level are
+    set in the companion app. Commands are only honoured while the app is open in the foreground.
+  triggers:
+  - trigger: state
+    entity_id: binary_sensor.downstairs_person
+    to: 'on'
+  - trigger: state
+    entity_id: binary_sensor.downstairs_person
+    to: 'off'
+    for: '00:05:00'
+  - trigger: state
+    entity_id: sensor.living_room_jellyfin_playback
+    to: playing
+  - trigger: state
+    entity_id: sensor.living_room_jellyfin_playback
+    to: idle
+    for: '00:00:30'
   conditions: []
   actions:
-  - action: notify.mobile_app_apple_square_v2
-    data:
-      title: Virtual desktop needs you
-      message: "{{ trigger.json.reason | default('(no reason given)') }}"
+  - variables:
+      sleep: "{{ not (is_state('binary_sensor.downstairs_person', 'on') and not is_state('sensor.living_room_jellyfin_playback', 'playing')) }}"
+      screensaver_pct: 10  # app default was 40, too bright for a dark room; raise if it is unreadable
+  - if:
+    - condition: template
+      value_template: '{{ sleep }}'
+    then:
+    - action: notify.mobile_app_ipad_panel
       data:
-        push:
-          interruption-level: time-sensitive
-  mode: queued
-  max: 10
+        message: kiosk_set_screensaver_brightness
+        data:
+          level: '{{ screensaver_pct }}'
+    - delay: '00:00:01'  # APNs does not guarantee order; let the level land before the screensaver draws
+  - action: notify.mobile_app_ipad_panel
+    data:
+      message: "{{ 'kiosk_show_screensaver' if sleep else 'kiosk_hide_screensaver' }}"
+  mode: restart

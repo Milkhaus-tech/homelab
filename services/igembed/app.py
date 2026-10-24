@@ -49,6 +49,20 @@ class Extractor:
         self.cookies_file = cookies_file
 
     def extract(self, shortcode):
+        """Anonymous first; the burner session is spent only on posts that need a login."""
+        try:
+            return self._extract(shortcode, None)
+        except Exception:
+            if not self.cookies_file:
+                raise
+        try:
+            return self._extract(shortcode, self.cookies_file)
+        except Exception as exc:
+            if _checkpointed(exc):
+                raise RuntimeError("login checkpoint: Instagram locked the burner session") from exc
+            raise
+
+    def _extract(self, shortcode, cookies_file):
         url = f"https://www.instagram.com/reel/{shortcode}/"
         options = {
             "quiet": True,
@@ -58,8 +72,8 @@ class Extractor:
             "format": "best[acodec!=none][vcodec!=none]/best",
             "ignore_no_formats_error": True,
         }
-        if self.cookies_file:
-            options["cookiefile"] = self.cookies_file
+        if cookies_file:
+            options["cookiefile"] = cookies_file
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=False)
         item = _first_media(info)
@@ -85,6 +99,17 @@ class Extractor:
             "height": None,
             **metadata,
         }
+
+
+def _checkpointed(exc):
+    """True when Instagram answered the cookie session with a login challenge."""
+    error = (getattr(exc, "exc_info", None) or (None, exc))[1]
+    response = getattr(error, "response", None)
+    try:
+        body = response.read() if response is not None else b""
+    except Exception:
+        return False
+    return b"checkpoint_required" in body or b"challenge_required" in body
 
 
 def _first_media(info):
@@ -189,6 +214,7 @@ def _classify_failure(message):
     message = message.lower()
     if any(marker in message for marker in (
         "login", "cookies", "empty media response", "not granting access", "rate-limit",
+        "certain audiences", "available to everyone", "age-restricted",
     )):
         return "auth"
     if any(marker in message for marker in (

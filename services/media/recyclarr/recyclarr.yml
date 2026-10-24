@@ -6,8 +6,9 @@ sonarr:
     base_url: http://sonarr:8989
     api_key: !secret sonarr_apikey
 
-    quality_definition:
-      type: series
+    # quality_definition removed 2026-09-22: TRaSH sizes are h264-calibrated and
+    # rejected the x265 packs this config deliberately prefers (+200). Minimums are
+    # now hand-set to half of TRaSH via the Sonarr API.
 
     quality_profiles:
       - name: 1080p Efficient
@@ -55,6 +56,21 @@ sonarr:
           - ec8fa7296b64e8cd390a1600981f3923 # Repack/Proper
         assign_scores_to:
           - name: 1080p Efficient
+      # Season Pack: outranks any single-episode bonus so a requested season
+      # lands as one pack; anime scores stay under each profile's dub/sub gate.
+      - trash_ids:
+          - 3bc5f395426614e155e585a2f056cdf1 # Season Pack
+        assign_scores_to:
+          - name: 1080p Efficient
+            score: 1000
+          - name: Any
+            score: 50
+          - name: 720p smart
+            score: 50
+          - name: 720p smart - ANIME
+            score: 5
+          - name: 720p smart - ANIME - DUBS ONLY
+            score: 50
 
 radarr:
   radarr-main:

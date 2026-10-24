@@ -4,6 +4,9 @@ services:
     container_name: gluetun
     cap_add:
       - NET_ADMIN
+    sysctls:
+      # BBR inside the VPN netns (host BBR doesn't reach it; TG server is lossy)
+      - net.ipv4.tcp_congestion_control=bbr
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
@@ -27,6 +30,7 @@ services:
     restart: always
 
   qbittorrent:
+    cpu_shares: 512
 
     cpuset: "0-9"    # keep off cores 10-15, reserved for game servers
     image: lscr.io/linuxserver/qbittorrent:latest
@@ -62,6 +66,7 @@ services:
     restart: always
 
   radarr:
+    cpu_shares: 512
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
     environment:
@@ -81,6 +86,7 @@ services:
     restart: always
 
   sonarr:
+    cpu_shares: 512
 
     cpuset: "0-9"    # keep off cores 10-15, reserved for game servers
     image: lscr.io/linuxserver/sonarr:latest
@@ -102,6 +108,7 @@ services:
     restart: always
 
   prowlarr:
+    cpu_shares: 512
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
     environment:
@@ -127,6 +134,7 @@ services:
       - "8056:8056"
     volumes:
       - ./jfa-go/config:/data
+      - ./jfa-go/config/form.html:/opt/jfa-go/data/html/form.html:ro # trims username/email at signup
       - ../jellyfin/config:/jb:ro # Jellyfin appdata (password resets)
     environment:
       - TZ=America/Los_Angeles
@@ -164,6 +172,7 @@ services:
 #       - /mnt/media:/media
 #
   cleanuparr:
+    cpu_shares: 512
     image: ghcr.io/cleanuparr/cleanuparr:latest
     container_name: cleanuparr
     environment:
@@ -178,6 +187,7 @@ services:
     restart: always
 
   unpackerr:
+    cpu_shares: 512
     image: golift/unpackerr:latest
     container_name: unpackerr
     volumes:
@@ -204,6 +214,7 @@ services:
     restart: always
 
   bazarr:
+    cpu_shares: 512
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     environment:
@@ -218,6 +229,7 @@ services:
     restart: always
 
   recyclarr:
+    cpu_shares: 512
     image: ghcr.io/recyclarr/recyclarr:8
     container_name: recyclarr
     user: "1000:1000"
@@ -229,6 +241,7 @@ services:
     restart: always
 
   autobrr:
+    cpu_shares: 512
     image: ghcr.io/autobrr/autobrr:latest
     container_name: autobrr
     user: "1000:1000"
@@ -241,6 +254,7 @@ services:
     restart: always
 
   cross-seed:
+    cpu_shares: 512
     image: ghcr.io/cross-seed/cross-seed:latest
     container_name: cross-seed
     user: "1000:1000"

@@ -1,52 +1,54 @@
 # Home Assistant
 
-Automation hub for the house: presence-driven HVAC, irrigation with a failsafe,
-doorbell capture, chore notifications, and the webhook relay that lets everything else
-on the box reach a phone. Runs with host networking beside a Matter bridge and an
-authenticated Mosquitto broker.
+Runs the house: the thermostat follows whether anyone's home, the downstairs lights
+follow the cameras, the doorbell sends a clip, and chores get reminders.
 
-## Stack
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable from:** Tailscale and the LAN only · **Talks to:** [Frigate](../frigate/) on jesus, [Donetick](../donetick/)
 
-| Container | Role |
+## How it works
+
+| Container | What it does |
 |---|---|
-| `homeassistant` | HA core, host network, `/mnt/media/homeassistant` as media dir |
-| `matter-bridge` | matterbridge — exposes HA devices to Matter controllers via a long-lived token ([`.env`](.env.example)) |
-| `mosquitto` | MQTT broker, **anonymous access off**, password file outside the repo — Frigate and HA share the credential |
+| `homeassistant` | Home Assistant itself, on the host network |
+| `mosquitto` | The MQTT broker Frigate and Home Assistant talk through. Logins required |
+| `matter-server`, `matter-bridge` | Matter support, and matterbridge, which shares my Home Assistant devices with other Matter apps |
+| `go2rtc-tuya` | Relays the cat feeders' cameras so Home Assistant gets a clean stream |
 
-## Automations worth reading
+The automations in [`automations.yaml`](automations.yaml):
 
-[`automations.yaml`](automations.yaml) is small but carries a few patterns that took
-iteration to get right:
+- **Heating and cooling.** Leaving or coming home flips the thermostat between away and
+  home, plus a precool before the 6pm peak rate. Zone events sometimes get missed, so
+  two pollers (`Check if Away` / `Check if Home`) catch up. They skip anything already in
+  the right state so they don't undo a manual change, and they run on the same days.
+  When one of them only ran on weekdays, the house stayed in away mode all weekend.
+- **Downstairs lights** turn on when Frigate sees a person after dark and turn off after
+  10 minutes with nobody there. They dim instead while Jellyfin is playing on the TV.
+- **The iPad wall panel** wakes when someone's downstairs and goes to its screensaver
+  when nobody is.
+- **The doorbell** runs on a battery and sleeps, so its motion sensor wakes it, then it
+  records a 20-second clip and sends a snapshot to both our phones.
+- **Chores.** Donetick's webhook comes in here and becomes a phone notification
+  ([details](../donetick/)).
 
-- **Presence HVAC with recovery pollers.** Zone triggers set the thermostat home/away,
-  but zone events can be missed — so paired `Check if Away` / `Check if Home`
-  automations poll on a time pattern as a catch-up net. The conditions encode two
-  hard-won rules: the poller must be idempotent (a "not already away" guard stops it
-  re-sending and overriding manual changes), and **both pollers must run the same
-  weekday set** — when the home-recovery poller ran Mon–Fri only, an away state set on
-  Friday night persisted all weekend.
-- **Pump failsafe.** The irrigation automations use an in-memory 2-minute delay, so an
-  HA restart mid-run would leave the pump running indefinitely. `Pump failsafe off`
-  backstops it two ways: an on-for-5-minutes state trigger (catches everything,
-  including a manual turn-on someone forgot), and an HA-start trigger (catches the
-  restart-mid-run case).
-- **Doorbell capture.** The battery doorbell sleeps; its motion-detect entity turning
-  on wakes it, then a short delay, a 20 s clip with 3 s lookback, a snapshot, and a
-  photo notification to both phones — queued mode so bursts don't drop.
-- **Webhook relays.** Two `local_only` webhooks turn box events into phone pushes:
-  Donetick chore reminders route to the *assignee's* phone (completions notify the
-  other partner), and [`vd-flag`](../../virtual-desktop/bin/vd-flag) fires a
-  time-sensitive push when an automation agent is blocked on a login wall or captcha.
-  Webhook ids are redacted here.
+[`scripts.yaml`](scripts.yaml) has the buttons: pan/tilt for the cameras, one portion
+from each cat feeder, Fire TV remote helpers (launch or resume Jellyfin, type into a
+search box), and a "Dance Party" scene for the lamps.
 
-[`scripts.yaml`](scripts.yaml) holds the callable pieces: PTZ pulse-move helpers for
-the [Frigate](../frigate/) cameras, a cat-feeder portion trigger, an ADB command that
-launches Jellyfin on the living-room TV, and a scene that sets every lamp to its
-"Dance Party" effect, because of course it does.
+## Worth knowing
 
-## Metrics
+- The ecobee ignores mode changes while a hold is active, so every thermostat automation
+  clears the hold first.
+- Prometheus reads Home Assistant's `/api/prometheus` with its own long-lived token, so
+  house temperature, humidity and battery levels show up in [Grafana](../monitoring/).
+- Webhook ids are redacted in this copy, and the Matter bridge's token comes from
+  [`.env`](.env.example).
 
-The `prometheus:` integration exposes `/api/prometheus`, scraped by the
-[monitoring stack](../monitoring/) with a dedicated long-lived token — house
-temperature, humidity, entity availability, and automation trigger counts end up on
-the Grafana home dashboard.
+## Files
+
+| File | What it is |
+|---|---|
+| [`docker-compose.yml`](docker-compose.yml) | All five containers |
+| [`configuration.yaml`](configuration.yaml) | Main config: Prometheus, camera feeds, light groups, sensors |
+| [`automations.yaml`](automations.yaml) | The automations above |
+| [`scripts.yaml`](scripts.yaml) | Buttons and helpers |
+| [`mosquitto.conf`](mosquitto.conf) | MQTT broker config |

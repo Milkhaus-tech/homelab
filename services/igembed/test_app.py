@@ -1,11 +1,12 @@
 import asyncio
 from io import BytesIO
+from types import SimpleNamespace
 
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 from PIL import Image
 
-from app import create_app
+from app import Extractor, _classify_failure, create_app
 from test_page import run_checks as run_page_checks
 
 
@@ -121,6 +122,8 @@ async def run_tests():
         ("empty media response", "auth", "Instagram won&#x27;t show this post without a login"),
         ("site is not granting access", "auth", "Instagram won&#x27;t show this post without a login"),
         ("rate-limit reached", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("[Instagram] X: This content isn't available to everyone: It can't be seen by certain audiences.", "auth", "Instagram won&#x27;t show this post without a login"),
+        ("This content may be inappropriate: It's unavailable for certain audiences", "auth", "Instagram won&#x27;t show this post without a login"),
         ("post not found", "gone", "this post is unavailable"),
         ("post does not exist", "gone", "this post is unavailable"),
         ("post unavailable", "gone", "this post is unavailable"),
@@ -296,7 +299,48 @@ async def run_tests():
         await fallback_server.close()
 
 
+def run_extractor_checks():
+    class Stub(Extractor):
+        def __init__(self, cookies_file, outcomes):
+            super().__init__(cookies_file)
+            self.outcomes, self.calls = outcomes, []
+
+        def _extract(self, shortcode, cookies_file):
+            self.calls.append(cookies_file)
+            outcome = self.outcomes[cookies_file]
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+    public = Stub("c.txt", {None: RESULT})
+    assert public.extract(ID) == RESULT and public.calls == [None]
+
+    restricted = Stub("c.txt", {None: RuntimeError("login required"), "c.txt": RESULT})
+    assert restricted.extract(ID) == RESULT and restricted.calls == [None, "c.txt"]
+
+    locked = RuntimeError("HTTP Error 400: Bad Request")
+    locked.exc_info = (None, SimpleNamespace(
+        response=BytesIO(b'{"message":"checkpoint_required","lock":true}')), None)
+    for cookie_error, expected in ((locked, "auth"), (RuntimeError("HTTP Error 404"), "gone")):
+        stub = Stub("c.txt", {None: RuntimeError("login required"), "c.txt": cookie_error})
+        try:
+            stub.extract(ID)
+        except Exception as exc:
+            assert _classify_failure(str(exc)) == expected, exc
+        else:
+            raise AssertionError("extract should have raised")
+
+    anonymous_only = Stub(None, {None: RuntimeError("login required")})
+    try:
+        anonymous_only.extract(ID)
+    except RuntimeError:
+        assert anonymous_only.calls == [None]
+    else:
+        raise AssertionError("extract should have raised")
+
+
 if __name__ == "__main__":
+    run_extractor_checks()
     run_page_checks()
     asyncio.run(run_tests())
     print("all tests passed")

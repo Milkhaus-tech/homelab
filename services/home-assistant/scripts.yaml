@@ -43,7 +43,7 @@ dance_party:
   alias: Dance Party
   description: ''
 feed_cat_1_portion:
-  alias: Feed Cat 1 Portion
+  alias: Feed Buffy & Willow 1 Portion
   sequence:
   - target:
       entity_id: number.smart_pet_feeder_feed
@@ -51,15 +51,68 @@ feed_cat_1_portion:
       value: 1
     action: number.set_value
   description: ''
+tv_launch_app:
+  alias: TV - Launch App
+  description: Wake the Fire TV, dismiss the screensaver if showing, launch an app by package
+  fields:
+    package:
+      required: true
+      example: org.jellyfin.androidtv
+  sequence:
+  - action: media_player.turn_on
+    target:
+      entity_id: media_player.living_room_living_room_tv
+  - action: androidtv.adb_command
+    target:
+      entity_id: media_player.living_room_living_room_tv
+    data:
+      command: >-
+        input keyevent 224; sleep 1; dumpsys activity activities | grep -q com.amazon.ftv.screensaver && input keyevent 4 && sleep 1; monkey -p {{ package }} -c android.intent.category.LEANBACK_LAUNCHER 1
+
 launch_jellyfin:
+  alias: Launch Jellyfin
+  description: ''
+  sequence:
+  - action: script.tv_launch_app
+    data:
+      package: org.jellyfin.androidtv
+
+tv_send_keyevent:
+  alias: TV - Send Keyevent
+  description: Send a single Android keyevent code to the Fire TV (dpad, back, home, menu, ...)
+  fields:
+    keycode:
+      required: true
+      example: 19
   sequence:
   - action: androidtv.adb_command
     target:
       entity_id: media_player.living_room_living_room_tv
     data:
-      command: am start -n org.jellyfin.androidtv/org.jellyfin.androidtv.ui.MainActivity
-  alias: Launch Jellyfin
-  description: ''
+      command: input keyevent {{ keycode }}
+
+tv_type:
+  alias: TV - Type Text
+  description: Type text into whatever field is focused on the Fire TV, then press Enter (keyboard passthrough from the kiosk)
+  mode: queued
+  fields:
+    text:
+      required: true
+      example: the office
+  sequence:
+  - action: androidtv.adb_command
+    target:
+      entity_id: media_player.living_room_living_room_tv
+    data:
+      command: >-
+        input text "{{ text | regex_replace('[\"\\`$]', '') | replace(' ', '%s') }}"; sleep 0.3; input keyevent 66
+resume_jellyfin:
+  alias: Resume Jellyfin
+  description: Launch Jellyfin on the Fire TV and continue the signed-in account's show
+  mode: single
+  sequence:
+  - action: script.launch_jellyfin
+  - action: shell_command.jellyfin_resume
 ptz_left_1s:
   alias: PTZ Left 1s
   sequence:
@@ -204,3 +257,41 @@ ptz_down_1s:
         data:
           entity_id: camera.tapo_2
           action: stop
+feed_gumball_1_portion:
+  alias: Feed Gumball 1 Portion
+  description: Feeds Gumball's feeder directly over the LAN (no Tuya cloud); pushes
+    a phone alert if the feeder does not ack.
+  sequence:
+  - action: shell_command.feed_tuya
+    data:
+      feeder: gumball
+      portions: 1
+    response_variable: feed
+    continue_on_error: true
+  - if:
+    - condition: template
+      value_template: '{{ feed is not defined or feed.returncode != 0 }}'
+    then:
+    - action: notify.mobile_app_apple_square_v2
+      data:
+        title: Feed Gumball failed
+        message: '{{ ((feed.stderr or feed.stdout) if feed is defined else "shell_command did not run") | truncate(180) }}'
+feed_margarita_1_portion:
+  alias: Feed Margarita 1 Portion
+  description: Feeds Margarita's feeder directly over the LAN (no Tuya cloud); pushes
+    a phone alert if the feeder does not ack.
+  sequence:
+  - action: shell_command.feed_tuya
+    data:
+      feeder: margarita
+      portions: 1
+    response_variable: feed
+    continue_on_error: true
+  - if:
+    - condition: template
+      value_template: '{{ feed is not defined or feed.returncode != 0 }}'
+    then:
+    - action: notify.mobile_app_apple_square_v2
+      data:
+        title: Feed Margarita failed
+        message: '{{ ((feed.stderr or feed.stdout) if feed is defined else "shell_command did not run") | truncate(180) }}'

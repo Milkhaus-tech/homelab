@@ -1,58 +1,48 @@
 # igembed
 
-A small, self-hosted Instagram embed fixer for Discord. Replace `instagram.com`
-with `ig.milkhaus.net` in a reel or post URL; bots receive video OpenGraph tags,
-while people are redirected to Instagram.
+Makes Instagram links preview properly in Discord. Swap `instagram.com` for
+`ig.milkhaus.net` in a post or reel link: Discord gets the video or photos to embed,
+and a person who clicks it lands on Instagram. It's the sibling of
+[xembed](../xembed/), which does the same for X.
 
-Photo posts and carousels embed as images (carousels use a stitched grid of the first four); `ignore_no_formats_error` lets yt-dlp remain the only extractor.
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable at:** `ig.milkhaus.net`
 
-Routes:
+## How it works
 
-- `GET /api/<id>` returns post metadata and bot-friendly media URLs as JSON.
-- `GET`/`HEAD /image/<id>/<n>` proxies one 1-based carousel image or a video's thumbnail.
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) does the fetching. Videos embed as video.
+  Photo posts and carousels embed as images, and a carousel becomes one grid of every
+  photo (two columns up to four photos, three after that).
+- Every post is tried logged out first. Only if that fails does it use `cookies.txt`, the
+  session of a throwaway Instagram account I keep just for fetching (the "burner"). That
+  keeps the burner's traffic low so Instagram leaves it alone.
+- Routes: `GET /api/<id>` returns the post as JSON so a bot can post a carousel as
+  separate images, and `/video/<id>`, `/image/<id>` and `/image/<id>/<n>` proxy the media.
 
-A bot can use `/api/<id>` to post a photo carousel as individual images; Discord shows up to four images per embed group.
+Run it with `docker compose up -d --build`. To pick up a new yt-dlp, rebuild from
+scratch with `docker compose build --pull --no-cache && docker compose up -d`. Tests
+need no network: `python test_app.py` (with `aiohttp`, `yt-dlp` and `Pillow`
+installed).
 
-Run it with `docker compose up -d --build`. To update yt-dlp, rebuild from a fresh
-base and package install:
+## If it breaks
 
-```sh
-docker compose build --pull --no-cache && docker compose up -d
-```
+My Discord bot (Teto) asks for a repair by dropping a request file, and a systemd path
+watcher (`sudo ./install-heal.sh`) runs [`heal.sh`](heal.sh):
 
-If anonymous extraction becomes blocked, export Instagram cookies in Netscape
-format as `cookies.txt`, then uncomment `IG_COOKIES_FILE` and the bind mount in
-`docker-compose.yml`.
+1. After a 3-minute cooldown it recreates the container if it's unhealthy and retries
+   the post. A deleted post needs no fix.
+2. A login or connection failure gets fresh cookies from the burner's session in the
+   signed-in browser on noahlab ([virtual desktop](../../virtual-desktop/)), then a
+   restart and another try.
+3. If the burner got logged out, [`login_burner.py`](login_burner.py) logs it back in
+   with Bitwarden's autofill shortcut, at most every 6 hours, without reading the password.
+4. It leaves a result file for the bot. Anything it can't fix messages me.
 
-Caddy configuration:
+## Files
 
-```caddyfile
-ig.milkhaus.net { reverse_proxy 10.0.0.2:8095 }
-```
-
-DNS is a Cloudflare A record for `ig` pointing to the VPS.
-
-Run the network-free test suite with `python test_app.py` after installing
-`aiohttp`, `yt-dlp`, and `Pillow`.
-
-## Self-healing
-
-The Discord bot requests a repair by atomically creating
-`data/igembed.heal` in its repository with JSON fields `shortcode`, `reason`,
-and `requested_at`. The host responds in `data/igembed.heal.result` with
-`requested_at`, `healed`, `action` (`none`, `restart`, or `cookies`), `detail`,
-and the Unix timestamp `finished_at`.
-
-Install the root-owned path watcher with `sudo ./install-heal.sh`. On a request,
-`heal.sh` removes the request immediately, observes a 180-second cooldown,
-recreates an unhealthy container, and probes the reported post. An unavailable
-post needs no repair. Authentication, extraction, or connectivity failures
-trigger a cookie refresh followed by a restart and another probe. Every run
-leaves an atomic result for the bot and records its steps in
-`data/igembed-heal.log`.
-
-Cookie refresh reads the burner account's session from Chrome on this host's
-display `:0`, through its browser-level CDP endpoint on port 9222. It does not
-open a tab. If that browser is gone or the burner is logged out, refresh fails,
-the old cookie file is retained, and the reason appears in the healing log and
-result.
+| File | What it is |
+|---|---|
+| [`app.py`](app.py), [`Dockerfile`](Dockerfile), [`docker-compose.yml`](docker-compose.yml) | The server |
+| [`heal.sh`](heal.sh), [`install-heal.sh`](install-heal.sh), [`systemd/`](systemd/) | The repair path |
+| [`export_cookies.py`](export_cookies.py), [`login_burner.py`](login_burner.py) | Cookie refresh and burner login |
+| [`test_app.py`](test_app.py), [`test_page.py`](test_page.py), [`test_login_burner.py`](test_login_burner.py) | Tests |
+| [`static/`](static/) | The landing page |

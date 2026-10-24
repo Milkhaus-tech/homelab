@@ -31,17 +31,6 @@ services:
       - /opt/monitoring/branding/apple-touch-icon.png:/usr/share/grafana/public/build/img/apple-touch-icon.png:ro
       - /opt/monitoring/branding/teto_loading.svg:/usr/share/grafana/public/build/img/grafana_icon.svg:ro
 
-  node_exporter:
-    image: quay.io/prometheus/node-exporter:latest
-    container_name: node_exporter
-    restart: unless-stopped
-    network_mode: host
-    pid: host
-    command:
-      - '--path.rootfs=/host'
-    volumes:
-      - /:/host:ro,rslave
-
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
@@ -51,6 +40,8 @@ services:
       - CADVISOR_HEALTHCHECK_URL=http://localhost:8098/healthz
     command:
       - '--port=8098' # 8080 is taken by qBittorrent WebUI
+      - '--housekeeping_interval=30s'
+      - '--docker_only=true'
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -60,35 +51,9 @@ services:
     devices:
       - /dev/kmsg
 
-  exportarr-sonarr:
-    image: ghcr.io/onedr0p/exportarr:latest
-    container_name: exportarr-sonarr
-    restart: unless-stopped
-    network_mode: host
-    command: ["sonarr"]
-    environment:
-      - PORT=9707
-      - URL=http://192.168.1.10:8989
-      - APIKEY=${SONARR_API_KEY}
 
-  exportarr-radarr:
-    image: ghcr.io/onedr0p/exportarr:latest
-    container_name: exportarr-radarr
+  blackbox:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox
     restart: unless-stopped
-    network_mode: host
-    command: ["radarr"]
-    environment:
-      - PORT=9708
-      - URL=http://192.168.1.10:7878
-      - APIKEY=${RADARR_API_KEY}
-
-  exportarr-prowlarr:
-    image: ghcr.io/onedr0p/exportarr:latest
-    container_name: exportarr-prowlarr
-    restart: unless-stopped
-    network_mode: host
-    command: ["prowlarr"]
-    environment:
-      - PORT=9709
-      - URL=http://192.168.1.10:9696
-      - APIKEY=${PROWLARR_API_KEY}
+    network_mode: host # :9115; probes the public sites listed in prometheus.yml (job 'sites')

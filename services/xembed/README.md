@@ -2,6 +2,9 @@
 
 A small, self-hosted X/Twitter embed fixer for Discord. Replace `x.com` with
 `x.milkhaus.net`; bots receive OpenGraph tags while people are redirected to X.
+It's the sibling of [igembed](../igembed/), which does the same for Instagram.
+
+**Runs on:** noahlab ([the boxes](../../README.md#the-boxes)) · **Reachable at:** `x.milkhaus.net`
 
 Routes:
 

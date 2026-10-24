@@ -3,7 +3,7 @@ go2rtc:
     listen: :1984
   webrtc:
     candidates:
-      - 192.168.1.10:8555
+      - 192.168.1.211:8555
       - stun:8555
   streams:
     tapo_1:
@@ -44,7 +44,7 @@ go2rtc:
       - rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@192.168.1.209/stream2
 mqtt:
   enabled: true
-  host: 192.168.1.10
+  host: 192.168.1.210
   port: 1883
   user: mqtt
   password: '{FRIGATE_MQTT_PASSWORD}'
@@ -58,16 +58,17 @@ ffmpeg:
     detect: -f rawvideo -pix_fmt yuv420p
 
 detectors:
-  onnx:
-    type: onnx
+  ov:
+    type: openvino
+    device: CPU
 
 model:
-  model_type: yolox
-  width: 416
-  height: 416
+  model_type: yolo-generic  # yolov9-s @320, exported per the Frigate docs (models-build/); yolox_nano called backpacks/cats "person"
+  width: 320
+  height: 320
   input_tensor: nchw
-  input_dtype: float_denorm
-  path: /config/model_cache/onnx/yolox_nano.onnx
+  input_dtype: float
+  path: /config/model_cache/yolov9-s-320.onnx
   labelmap_path: /labelmap/coco-80.txt
 
 objects:
@@ -164,6 +165,7 @@ cameras:
       width: 1280
       height: 720
       fps: 5
+      max_disappeared: 50  # 10 s: a couch sitter drops below score for a few seconds at a time
     objects:
       track:
         - cat
@@ -175,8 +177,18 @@ cameras:
           min_area: 500
         person:
           min_score: 0.4
-          threshold: 0.6
-          min_area: 5000
+          threshold: 0.5  # yolov9-s: static objects/cats score <0.1, partially visible sitters 0.4-0.6
+          min_area: 8000
+    zones:
+      # exits: a person last seen in one of these and then nowhere has left the room
+      stairs:
+        coordinates: 0.10,0.12,0.27,0.12,0.27,0.48,0.10,0.48
+        objects:
+          - person
+      door:
+        coordinates: 0.0,0.35,0.10,0.35,0.10,0.65,0.0,0.65
+        objects:
+          - person
     record:
       enabled: true
       continuous:
@@ -237,6 +249,12 @@ cameras:
       width: 1280
       height: 720
       fps: 5
+    objects:
+      filters:
+        person:
+          min_score: 0.4
+          threshold: 0.5  # yolov9-s: static objects/cats score <0.1, partially visible sitters 0.4-0.6
+          min_area: 8000
     record:
       enabled: true
       continuous:

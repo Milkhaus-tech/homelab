@@ -1,5 +1,6 @@
 services:
   jellyfin:
+    cpu_shares: 2048
     cpuset: "0-9"    # keep off cores 10-15, reserved for game servers
     image: jellyfin/jellyfin:10.11.11
     container_name: jellyfin
@@ -11,6 +12,14 @@ services:
       - ./config:/config
       - ./cache:/cache
       - /mnt/media:/media
+      - ./web/index.html:/jellyfin/jellyfin-web/index.html:ro
+      - ./web/milkhaus-ident.js:/jellyfin/jellyfin-web/milkhaus-ident.js:ro
+      - ./web/manifest.json:/jellyfin/jellyfin-web/manifest.json:ro
+      - ./web/favicon.ico:/jellyfin/jellyfin-web/favicon.ico:ro
+      - ./web/favicon.svg:/jellyfin/jellyfin-web/favicon.svg:ro
+      - ./web/apple-touch-icon.png:/jellyfin/jellyfin-web/apple-touch-icon.png:ro
+      - ./web/icon-192.png:/jellyfin/jellyfin-web/icon-192.png:ro
+      - ./web/icon-512.png:/jellyfin/jellyfin-web/icon-512.png:ro
     restart: always
     # THIS PART IS REQUIRED FOR THE GPU TO WORK:
     deploy:
@@ -24,3 +33,16 @@ services:
       - TZ=America/Los_Angeles
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
+
+  # Cloudflare Tunnel for stream.milkhaus.net — takes the VPS/WireGuard hop out of the video path (2026-09-21).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    network_mode: host
+    user: "1000:1000"
+    environment:
+      - HOME=/cf
+    volumes:
+      - ./cloudflared:/cf/.cloudflared:ro
+    command: tunnel --no-autoupdate --config /cf/.cloudflared/config.yml run
+    restart: always

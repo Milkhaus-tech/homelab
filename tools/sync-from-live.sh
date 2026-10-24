@@ -2,7 +2,8 @@
 # sync-from-live.sh — export live configs into this repo with secrets templated out.
 #
 # This repo is a sanitized mirror. The deployment source of truth is the live tree
-# (/opt/*, ~/docker/*, ~/bin, /etc/systemd/system); this script re-exports every
+# (/opt/*, ~/docker/*, ~/bin, /etc/systemd/system on noahlab, plus the stacks that run
+# on jesus, fetched over ssh); this script re-exports every
 # published file from it, applies the redaction rules below, then runs
 # tools/verify-no-leaks.sh and fails loudly if anything credential-shaped survives.
 #
@@ -27,8 +28,16 @@ priv() {
   [ -f tools/.private-tokens ] || return 0
   local k v
   while IFS='=' read -r k v; do
-    [ -n "$k" ] && sed -i "s/${k}/${v}/g" "$1"
+    [ -n "$k" ] && sed -i "s/${k}/${v}/gI" "$1"
   done < tools/.private-tokens
+}
+
+# R <box> <path> — fetch a file from another box into a temp dir, print the local copy's path.
+STAGE=$(mktemp -d); trap 'rm -rf "$STAGE"' EXIT
+R() {
+  local f="$STAGE/$1$(tr / _ <<<"$2")"
+  ssh -o BatchMode=yes -o ConnectTimeout=10 "$1" "sudo -n cat '$2'" > "$f" || { echo "MISSING: $1:$2" >&2; exit 1; }
+  echo "$f"
 }
 
 ## ---- media pipeline (already ${VAR}-templated in live) ----
@@ -42,15 +51,16 @@ X 755 "$H/bin/media-dedup.py"                                              servi
 X 644 "$H/docker/jellyfin/docker-compose.yml"                              services/jellyfin/docker-compose.yml
 X 755 "$H/bin/livetv-curate.py"                                            services/jellyfin/scripts/livetv-curate.py
 
-## ---- frigate ----
-X 644 /opt/frigate/docker-compose.yml services/frigate/docker-compose.yml \
+## ---- frigate (runs on jesus) ----
+X 644 "$(R jesus /opt/frigate/docker-compose.yml)" services/frigate/docker-compose.yml \
   's/FRIGATE_RTSP_PASSWORD=.*/FRIGATE_RTSP_PASSWORD=${FRIGATE_RTSP_PASSWORD}/' \
   's/^(\s*)(- FRIGATE_RTSP_PASSWORD=.*)/\1\2\n\1- FRIGATE_CAMERA_USER=${FRIGATE_CAMERA_USER}\n\1- FRIGATE_CAMERA_PASSWORD=${FRIGATE_CAMERA_PASSWORD}\n\1- FRIGATE_MQTT_PASSWORD=${FRIGATE_MQTT_PASSWORD}/'
 # config.yaml needs block-aware handling: camera creds vs the (non-secret) mqtt username.
+FRIGATE_CFG=$(R jesus /opt/frigate/config/config.yaml); export FRIGATE_CFG
 python3 - <<'PY'
-import re
+import os, re
 out, top = [], ""
-for line in open("/opt/frigate/config/config.yaml"):
+for line in open(os.environ["FRIGATE_CFG"]):
     if line.strip() and not line.startswith((" ", "\t")):
         top = line.split(":")[0].strip()
     line = re.sub(r"rtsp://[^:/@\s]+:[^@\s]+@", "rtsp://{FRIGATE_CAMERA_USER}:{FRIGATE_CAMERA_PASSWORD}@", line)
@@ -74,14 +84,15 @@ priv services/home-assistant/automations.yaml
 X 644 /opt/homeassist/config/scripts.yaml         services/home-assistant/scripts.yaml
 X 644 /opt/homeassist/mosquitto/config/mosquitto.conf services/home-assistant/mosquitto.conf
 
-## ---- monitoring ----
-X 644 /opt/monitoring/docker-compose.yml          services/monitoring/docker-compose.yml
-X 644 /opt/prometheus/prometheus.yml              services/monitoring/prometheus.yml
-X 644 /opt/monitoring/dashboards/build_glance.py   services/monitoring/dashboards/build_glance.py
-X 644 /opt/monitoring/dashboards/build_overview.py services/monitoring/dashboards/build_overview.py
+## ---- monitoring (runs on jesus) ----
+X 644 "$(R jesus /opt/monitoring/docker-compose.yml)"          services/monitoring/docker-compose.yml
+X 644 "$(R jesus /opt/prometheus/prometheus.yml)"              services/monitoring/prometheus.yml
+X 644 "$(R jesus /opt/monitoring/dashboards/build_glance.py)"   services/monitoring/dashboards/build_glance.py
+X 644 "$(R jesus /opt/monitoring/dashboards/build_overview.py)" services/monitoring/dashboards/build_overview.py
+X 644 /opt/monitoring/docker-compose.yml                       services/monitoring/exporters/docker-compose.yml
 
-## ---- pterodactyl (panel compose carries DB creds inline in live) ----
-X 644 /opt/pterodactyl/docker-compose.yml services/pterodactyl/docker-compose.yml \
+## ---- pterodactyl (panel on jesus, its compose carries DB creds inline; Factorio bits on noahlab) ----
+X 644 "$(R jesus /opt/pterodactyl/docker-compose.yml)" services/pterodactyl/docker-compose.yml \
   's/MYSQL_PASSWORD: .*/MYSQL_PASSWORD: "${MYSQL_PASSWORD}"/' \
   's/MYSQL_ROOT_PASSWORD: .*/MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"/' \
   's/DB_PASSWORD: .*/DB_PASSWORD: "${MYSQL_PASSWORD}"/' \
@@ -128,15 +139,15 @@ X 755 "$H/portwatch-tally.sh"                     ops/portwatch-tally.sh
 ## ---- edge ----
 X 644 "$H/milkhaus-site/vps/Caddyfile"            edge/Caddyfile
 
-## ---- virtual desktop ----
+## ---- virtual desktop (:0 on noahlab; the extra desktops run on jesus) ----
 X 644 /etc/X11/xorg.conf                          virtual-desktop/xorg.conf
 X 644 "$H/.xinitrc"                               virtual-desktop/xinitrc
 X 755 "$H/bin/vd-browser"                         virtual-desktop/bin/vd-browser
 X 755 "$H/bin/vd-input-bridge"                    virtual-desktop/bin/vd-input-bridge
-X 755 "$H/bin/vd-pair-sync"                       virtual-desktop/bin/vd-pair-sync
+X 755 "$(R jesus "$H/bin/vd-pair-sync")"         virtual-desktop/bin/vd-pair-sync
 X 755 "$H/bin/audible-desktops"                   virtual-desktop/bin/audible-desktops
 X 755 "$H/bin/audible-warroom"                    virtual-desktop/bin/audible-warroom
-X 755 "$H/bin/vd-desktop" virtual-desktop/bin/vd-desktop \
+X 755 "$(R jesus "$H/bin/vd-desktop")" virtual-desktop/bin/vd-desktop \
   's/VD_SUNSHINE_USER:-[^}]*/VD_SUNSHINE_USER:-moonlight/' \
   's/VD_SUNSHINE_PASS:-[^}]*/VD_SUNSHINE_PASS:-changeme/' \
   's#https://100\.[0-9]+\.[0-9]+\.[0-9]+:#https://<tailscale-ip>:#'

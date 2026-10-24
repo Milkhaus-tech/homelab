@@ -36,6 +36,9 @@ if [ "$rc" -ge 2 ]; then failed "tar rc=$rc for noah tools"; fi
 tar -C /home/noah --exclude='homelab/.git' --exclude='homelab/*/__pycache__' \
   -czf "$dest/noahlab-homelab.tar.gz" homelab; rc=$?
 if [ "$rc" -ge 2 ]; then failed "tar rc=$rc for /home/noah/homelab"; fi
+# Davidson's Tech Services records (LLC/EIN/permit PDFs, tracker, client jobs); ~15 MB, history included
+tar -C /home/noah -czf "$dest/noahlab-business.tar.gz" davidsons-tech-business client-jobs davidsons-tech-site; rc=$?
+if [ "$rc" -ge 2 ]; then failed "tar rc=$rc for business folders"; fi
 hype_data=$(docker volume inspect -f '{{.Mountpoint}}' goodnod_hype-data 2>/dev/null); rc=$?
 if [ "$rc" -eq 0 ] && [ -n "$hype_data" ]; then
   tar -C "$(dirname "$hype_data")" -czf "$dest/noahlab-goodnod-hype-data.tar.gz" "$(basename "$hype_data")"; rc=$?

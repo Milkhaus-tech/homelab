@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+[[ -f burner.env ]] && source burner.env
+
 BOT_DATA="${BOT_DATA:-/home/noah/discordbot/teto-private/data}"
 REQUEST="${REQUEST:-$BOT_DATA/igembed.heal}"
 RESULT="${RESULT:-$BOT_DATA/igembed.heal.result}"
 LOG="${LOG:-$BOT_DATA/igembed-heal.log}"
 STATE="${STATE:-/var/lib/igembed-heal/last}"
+LOGIN_STATE="${LOGIN_STATE:-/var/lib/igembed-heal/last-login}"
+LOGIN_COOLDOWN="${LOGIN_COOLDOWN:-21600}"
 CDP_PORT="${CDP_PORT:-9222}"
 PORT="${PORT:-8095}"
 BOT_UID="${BOT_UID:-1000}"
@@ -137,6 +141,10 @@ else
     log_step "refreshing Instagram cookies"
     if $DRY_RUN; then
         log_step "would run: python3 export_cookies.py $CDP_PORT cookies.txt.new"
+        if [[ -n "${BURNER_LOGIN:-}" ]]; then
+            log_step "if burner is logged out, would run login_burner.py after cooldown"
+            log_step "would alert with vd-flag if burner login failed"
+        fi
         action=cookies
     elif python3 export_cookies.py "$CDP_PORT" cookies.txt.new 2>"$export_error"; then
         chown "$COOKIE_UID" cookies.txt.new
@@ -144,10 +152,42 @@ else
         action=cookies
         detail="cookies refreshed"
     else
-        action=restart
+        export_message="$(<"$export_error")"
         detail="$(head -1 "$export_error")"
         log_step "cookie export failed: $detail"
         rm -f cookies.txt.new
+        if [[ "$export_message" == "burner is not logged in" && -n "${BURNER_LOGIN:-}" ]]; then
+            if [[ -e "$LOGIN_STATE" ]] && (( $(date +%s) - $(stat -c %Y "$LOGIN_STATE") < LOGIN_COOLDOWN )); then
+                log_step "login cooldown active"
+            else
+                mkdir -p "$(dirname "$LOGIN_STATE")"
+                touch "$LOGIN_STATE"
+                login_error="$(mktemp)"
+                log_step "logging in burner"
+                if sudo -u noah env DISPLAY=:0 XAUTHORITY=/home/noah/.Xauthority \
+                    python3 login_burner.py "$CDP_PORT" "$BURNER_LOGIN" 2>"$login_error"; then
+                    log_step "burner login succeeded"
+                    if python3 export_cookies.py "$CDP_PORT" cookies.txt.new 2>"$export_error"; then
+                        chown "$COOKIE_UID" cookies.txt.new
+                        mv -f cookies.txt.new cookies.txt
+                        action=cookies
+                        detail="cookies refreshed"
+                    else
+                        detail="$(head -1 "$export_error")"
+                        log_step "cookie export after login failed: $detail"
+                        rm -f cookies.txt.new
+                    fi
+                else
+                    detail="$(head -1 "$login_error")"
+                    log_step "burner login failed: $detail"
+                    if ! sudo -u noah /home/noah/bin/vd-flag "igembed: burner login failed: $detail"; then
+                        log_step "vd-flag failed"
+                    fi
+                fi
+                rm -f "$login_error"
+            fi
+        fi
+        [[ "$action" == cookies ]] || action=restart
     fi
     rm -f "$export_error"
     log_step "restarting container action=$action"

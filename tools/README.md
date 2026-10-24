@@ -1,43 +1,35 @@
 # Publishing pipeline
 
-This repo is public; the live tree it mirrors is full of credentials. These two
-scripts are the boundary between them.
+This repo is public, and the live configs it's copied from are full of passwords. These
+two scripts sit in between.
 
-## [`sync-from-live.sh`](sync-from-live.sh)
+**Runs on:** noahlab, by hand whenever I update the repo · CI runs the pattern check on every push
 
-Re-exports every published file from its live location (`/opt/*`, `~/docker/*`,
-`~/bin`, systemd units) and applies redaction **as patterns, never literal values** —
-inline credentials become `${VAR}` / `{FRIGATE_*}` templates documented by
-`.env.example` files, webhook ids and stream credentials become placeholders.
-Substitutions that would themselves reveal a private string (renaming a person, say)
-are read from `tools/.private-tokens`, an untracked `old=new` map — the mechanism is
-public, the names aren't.
+## How it works
 
-Why an export script instead of hard links or a shared checkout: a hard-linked file
-can't be redacted without editing the shared inode (corrupting the live config) or
-breaking the link (silently drifting). A copy with mandatory transforms + a verifier
-is the version of "linked to live" that can't leak.
+- [`sync-from-live.sh`](sync-from-live.sh) copies every published file from the box it
+  runs on (over ssh for jesus) and swaps the secrets out on the way. The rules are
+  patterns, never real values: inline credentials become `${VAR}` or `{FRIGATE_*}`
+  placeholders with a matching `.env.example`. Renames that would give away a private
+  string by themselves, like a person's name, come from `tools/.private-tokens`, an
+  untracked `old=new` list. The mechanism is public, the names aren't.
+- [`verify-no-leaks.sh`](verify-no-leaks.sh) runs at the end of every sync, and any hit
+  fails it. It checks two ways:
+  1. **Patterns** (also runs in CI): JWTs, private keys, logins inside stream URLs,
+     webhook ids, and any password/secret/token/key assignment that isn't a placeholder.
+  2. **Real values** (only at home, where the real secrets are): it reads the actual
+     secrets from every box's env files, configs and key files, plus the Tailscale
+     addresses, the VPS address and the private names, and makes sure none of them show
+     up in any file git would publish. A hit prints where the secret came from and which
+     file it landed in, never the value.
+- CI also runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push, so a bad
+  manual commit gets caught even if it skipped the sync.
 
-## [`verify-no-leaks.sh`](verify-no-leaks.sh)
+## Worth knowing
 
-Runs automatically at the end of every sync; a hit fails the sync. Two independent
-nets:
-
-1. **Pattern sweep** (also runs in CI): JWT shapes, private-key blocks, inline
-   RTSP stream credentials, webhook ids, and any value-bearing
-   password/secret/token/key assignment that isn't an approved placeholder.
-2. **Value sweep** (lab box only): harvests the *actual* secret values from the live
-   stores — env files, secret yaml/toml, password hashes, wallet, plus
-   identity/topology strings (mesh addresses, the VPS address, private names) — and
-   asserts none appear in any file git would publish, including URL-encoded forms.
-   Hits print the source label and offending file, **never the value**.
-
-CI re-runs the pattern net plus [gitleaks](https://github.com/gitleaks/gitleaks) on
-every push, so a bad manual commit gets caught even if it skipped the sync path.
-
-## Adding a file to the publish set
-
-Add a mapping line in `sync-from-live.sh` (plus transform rules if it carries
-secrets) and re-run. New secret *shapes* that no rule covers are the failure mode the
-verifier exists for: the sync dies loudly and the fix is a new rule, not a manual
-edit to the exported copy.
+- Why copies and not hard links: you can't redact a hard-linked file without editing the
+  live config, and a link that breaks just drifts. A copy plus a checker fails closed: a
+  new kind of secret stops the sync instead of slipping through.
+- To publish a new file, add a line to `sync-from-live.sh` (plus redaction rules if it
+  has secrets) and re-run it. Don't fix an exported copy by hand, because the next sync
+  overwrites it.
